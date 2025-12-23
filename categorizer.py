@@ -12,9 +12,35 @@ def categorize_transaction(merchant: str):
     m = merchant.lower()
 
     # -------------------------
+    # FOOD
+    # -------------------------
+    if any(x in m for x in [
+        "espresso",
+        "compass",
+        "sweet leaf"
+    ]):
+        return "Food", "Coffee"
+
+    if any(x in m for x in [
+        "doughnut",
+        "donut",
+        "toastique",
+        "tatte bakery",
+        "bakery"
+    ]):
+        return "Food", "Snacks"
+
+    if "chicken and whiskey" in m or "burger" in m:
+        return "Food", "Lunch/Dinner"
+
+    if "bethesda bagels" in m or "bagel" in m:
+        return "Food", "Breakfast"
+
+
+    # -------------------------
     # INTEREST / FEES
     # -------------------------
-    if "interest" in m or "fee" in m:
+    if "interest" in m or (("fee" in m or "fees" in m)):
         return "Anomalies", "Interest / Fees"
 
     # -------------------------
@@ -22,6 +48,16 @@ def categorize_transaction(merchant: str):
     # -------------------------
     if "uber eats" in m:
         return "Food Delivery", "Uber Eats"
+
+
+    # -------------------------
+    # GROOMING
+    # -------------------------
+    if "nail" in m:
+        return "Grooming", "Nails"
+
+    if "silver mirror" in m or "facial" in m:
+        return "Grooming", "Facials/Skin"
 
     # -------------------------
     # DINING
@@ -41,12 +77,16 @@ def categorize_transaction(merchant: str):
     # -------------------------
     # GROCERIES
     # -------------------------
+    if "instacart" in m:
+        return "Groceries", "Delivery"
+
     if any(x in m for x in [
         "trader joe",
         "giant",
-        "instacart"
+        "wholefds",
+        "whole foods"
     ]):
-        return "Groceries", "Groceries"
+        return "Groceries", "Store"
 
     # -------------------------
     # TRANSPORTATION
@@ -63,7 +103,7 @@ def categorize_transaction(merchant: str):
     if "lyft" in m:
         return "Transportation", "Lyft"
 
-    if "smart trip" in m:
+    if "smart trip" in m or "metro washington" in m:
         return "Transportation", "Metro"
 
     # -------------------------
@@ -103,17 +143,21 @@ def categorize_transaction(merchant: str):
     # -------------------------
     # BEAUTY / GROOMING
     # -------------------------
+    if "brow" in m or "contour" in m:
+        return "Grooming", "Threading/Waxing"
+
     if any(x in m for x in [
-        "brow",
         "salon",
-        "beauty",
-        "contour"
+        "beauty"
     ]):
         return "Beauty / Grooming", "Services"
 
     # -------------------------
     # SHOPPING
     # -------------------------
+    if "ann taylor" in m:
+        return "Shopping", "Clothes"
+
     if any(x in m for x in [
         "sephora",
         "skims",
@@ -122,6 +166,12 @@ def categorize_transaction(merchant: str):
         "amazon"
     ]):
         return "Shopping", "Retail"
+
+    # -------------------------
+    # OTHER
+    # -------------------------
+    if "dryydc" in m or "dry clean" in m:
+        return "Other", "Dry Cleaning"
 
     # -------------------------
     # DEFAULT
