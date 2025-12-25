@@ -314,7 +314,7 @@ c1, c2, c3 = st.columns(3)
 # -------- FOOD BREAKDOWN (WITH SUBCATEGORIES) --------
 with c1:
     food = category_subcategory_totals[
-        category_subcategory_totals["category"].isin(["Groceries", "Dining", "Food Delivery", "Food"])
+        category_subcategory_totals["category"].isin(["Groceries", "Food"])
     ]
     if not food.empty:
         st.markdown("### 🍽️ Food & Dining")
@@ -328,7 +328,7 @@ with c1:
                 "Groceries": "#54A24B",
                 "Dining": "#F58518",
                 "Food Delivery": "#E45756",
-                "Food": "#EECA3B"
+                "Food": "#EECA3B",
             },
             labels={"amount": "Amount ($)", "subcategory": ""},
             text_auto=".2f",

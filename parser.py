@@ -13,6 +13,8 @@ from parser_utils import (
     extract_citi_summary,
     extract_discover_statement_balance,
     extract_discover_summary,
+    extract_bank_of_america_summary,
+    extract_amex_summary,
     parse_date,
 )
 
@@ -59,6 +61,16 @@ BARCLAYS_ROW_REGEX = re.compile(
     re.VERBOSE,
 )
 
+AMEX_ROW_REGEX = re.compile(
+    r"""
+    ^(?P<trans_date>\d{1,2}/\d{1,2}/\d{2})\*?\s+
+    (?P<desc>.+?)\s+
+    (?P<amount>-?\$[\d,]+\.\d{2})
+    (?:\S*)?$   # swallow trailing symbols like ⧫
+    """,
+    re.VERBOSE,
+)
+
 
 # Bank-agnostic keyword hints
 CREDIT_KEYWORDS = [
@@ -66,7 +78,7 @@ CREDIT_KEYWORDS = [
     "credit",
     "refund",
     "return",
-    "adjustment",
+    "credit adjustment",
     "thank you",
 ]
 
@@ -77,28 +89,49 @@ SKIP_KEYWORDS = [
 ]
 
 def stitch_wrapped_lines(lines):
+    """
+    Generic line stitcher for statements where transactions can wrap:
+      - Citi: MM/DD ... $amt
+      - Amex: MM/DD/YY ... $amt OR $amt may appear inline
+             followed by reference line like "DG3W3WBT 20002"
+    """
     stitched = []
     buffer = ""
 
+    # Start-of-transaction patterns
+    starts_with_date = re.compile(r"^(?:\d{1,2}/\d{1,2}(?:/\d{2,4})?|[A-Za-z]{3}\s+\d{1,2})\b")
+
+    # "Has an amount anywhere" (not necessarily at end)
+    has_amount = re.compile(r"-?\$[\d,]+\.\d{2}")
+
     for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+
         # If line starts with a date, start a new buffer
-        if re.match(r"^\d{1,2}/\d{1,2}", line):
+        if starts_with_date.match(line):
             if buffer:
-                stitched.append(buffer.strip())
+                # only keep prior buffer if it contains an amount
+                if has_amount.search(buffer):
+                    stitched.append(buffer.strip())
             buffer = line
         else:
-            # Continuation of previous line
             buffer += " " + line
 
-        # If buffer now ends with an amount, finalize it
-        if re.search(r"-?\$[\d,]+\.\d{2}$", buffer):
-            stitched.append(buffer.strip())
-            buffer = ""
+        # Finalize if buffer has amount and line looks like it ends a record
+        # (Amex sometimes has inline amount, then next line is just reference code)
+        if has_amount.search(buffer):
+            # if this line contains amount, we can finalize immediately
+            if has_amount.search(line):
+                stitched.append(buffer.strip())
+                buffer = ""
 
-    if buffer:
+    if buffer and has_amount.search(buffer):
         stitched.append(buffer.strip())
 
     return stitched
+
 
 
 
@@ -132,10 +165,11 @@ def extract_transactions_from_pdf(pdf_file, card_name: str) -> pd.DataFrame:
     # Row-level extraction (BANK-AGNOSTIC)
     # -----------------------------
     raw_lines = [l.strip() for l in text.split("\n") if l.strip()]
-    if bank_type == "citi":
+    if bank_type in {"citi", "amex"}:
         lines = stitch_wrapped_lines(raw_lines)
     else:
         lines = raw_lines
+
 
 
     for line in lines:
@@ -192,6 +226,22 @@ def extract_transactions_from_pdf(pdf_file, card_name: str) -> pd.DataFrame:
             merchant = re.sub(r"^\d{1,2}/\d{1,2}", "", merchant)
             merchant = re.sub(r"-?\$[\d,]+\.\d{2}.*$", "", merchant)
             merchant = merchant.strip()
+        
+        # =========================
+        # Amex
+        # =========================
+        elif bank_type == "amex":
+            match = AMEX_ROW_REGEX.match(line.replace("⧫", "").strip())
+            if not match:
+                continue
+
+            date = parse_date(match.group("trans_date"))
+            merchant = match.group("desc").strip()
+            amount = normalize_amount(match.group("amount"))  # will be positive magnitude
+
+            # preserve sign from the raw string
+            if match.group("amount").strip().startswith("-"):
+                amount = -abs(amount)
 
 
         # ---- Generic rows
@@ -225,7 +275,9 @@ def extract_transactions_from_pdf(pdf_file, card_name: str) -> pd.DataFrame:
             "mobile payment",
             "mobile pymt",
             "payment received",
-            "internet payment"
+            "internet payment",
+            "credit adjustment",
+            "points for statement credit"
         ]
 
         merchant_lower = merchant.lower()
@@ -271,6 +323,8 @@ def extract_transactions_from_pdf(pdf_file, card_name: str) -> pd.DataFrame:
     # -----------------------------
     if bank_type == "barclays":
         spend_total, payments_credits_total = extract_barclays_summary(text)
+        print("DEBUG BARCLAYS:", payments_credits_total, spend_total)
+
 
     elif bank_type == "capital_one":
         spend_total = extract_capital_one_transactions_total(text)
@@ -285,6 +339,10 @@ def extract_transactions_from_pdf(pdf_file, card_name: str) -> pd.DataFrame:
 
     elif bank_type == "bank_of_america":
         spend_total, payments_credits_total = extract_bank_of_america_summary(text)
+
+    elif bank_type == "amex":
+        statement_balance, payments_credits_total, spend_total = extract_amex_summary(text)
+        
 
     else:
         spend_total = df[df["transaction_type"] == "spend"]["amount"].sum()
@@ -316,6 +374,7 @@ def extract_transactions_from_pdf(pdf_file, card_name: str) -> pd.DataFrame:
     df.attrs["statement_balance"] = statement_balance
     df.attrs["payments_credits_total"] = payments_credits_total
     df.attrs["bank_type"] = bank_type
+    df.attrs["spend_total"] = spend_total   
 
     return df
 
@@ -352,10 +411,21 @@ if __name__ == "__main__":
         statement_balance = df.attrs.get("statement_balance")
         payments_credits = df.attrs.get("payments_credits_total", 0.0)
         bank_type = df.attrs.get("bank_type", "unknown")
-        if not df.empty and "transaction_type" in df.columns:
+
+        # if not df.empty and "transaction_type" in df.columns:
+        #     total_spend = df[df["transaction_type"] == "spend"]["amount"].sum()
+        # else:
+        #     total_spend = 0.0
+
+        summary_spend = df.attrs.get("spend_total")
+
+        if summary_spend is not None:
+            total_spend = summary_spend
+        elif not df.empty and "transaction_type" in df.columns:
             total_spend = df[df["transaction_type"] == "spend"]["amount"].sum()
         else:
             total_spend = 0.0
+
 
         print(f"\n{'='*80}")
         print(f"📄 Statement: {card_name}")

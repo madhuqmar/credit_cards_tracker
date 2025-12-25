@@ -3,6 +3,7 @@ import pdfplumber
 import pandas as pd
 import re
 from datetime import datetime
+from typing import Optional, Tuple
 
 
 # =============================
@@ -16,17 +17,31 @@ def parse_date(token: str):
     """
     Parse dates safely with explicit year.
     Supports:
+    - MM/DD/YY   (Amex)
     - MM/DD
     - Mon DD
     """
+    token = token.strip()
     year = datetime.now().year
+
+    # 1) MM/DD/YY  (Amex, some Citi variants)
+    try:
+        return datetime.strptime(token, "%m/%d/%y").date()
+    except Exception:
+        pass
+
+    # 2) MM/DD (assume current year)
     try:
         return datetime.strptime(f"{token}/{year}", "%m/%d/%Y").date()
     except Exception:
-        try:
-            return datetime.strptime(f"{token} {year}", "%b %d %Y").date()
-        except Exception:
-            return None
+        pass
+
+    # 3) Mon DD (assume current year)
+    try:
+        return datetime.strptime(f"{token} {year}", "%b %d %Y").date()
+    except Exception:
+        return None
+
 
 
 def is_transaction_row(line: str) -> bool:
@@ -35,12 +50,32 @@ def is_transaction_row(line: str) -> bool:
     )
 
 
+def _money_to_float(s: str) -> float:
+    # accepts "612.08" or "$612.08" or "612.08 " etc.
+    s = s.strip().replace("$", "").replace(",", "")
+    return float(s)
+
 
 # =============================
 # Bank detection (filename-based)
 # =============================
 def detect_bank_type_from_filename(card_name: str) -> str:
     name = card_name.lower()
+
+    # Amex
+    amex_month = r"(jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)"
+    if (
+        # explicit keywords (if present)
+        "amex" in name
+        or "americanexpress" in name
+        or "american_express" in name
+        # OR Amex-style date range filenames
+        or re.search(
+            rf"{amex_month}.*{amex_month}.*\d{{4}}",
+            name
+        )
+    ):
+        return "amex"
 
     # Capital One
     if "venture" in name or "capitalone" in name or "capital_one" in name:
@@ -73,7 +108,11 @@ def detect_bank_type_from_filename(card_name: str) -> str:
 def extract_barclays_summary(text: str):
     purchases = payments = credits = 0.0
 
-    m = re.search(r"Purchases\s+\+?\$([\d,]+\.\d{2})", text, re.IGNORECASE)
+    m = re.search(
+        r"\bPurchases\b\s*\+?\s*\$?\s*([\d,]+\.\d{2})",
+        text,
+        re.IGNORECASE
+    )
     if m:
         purchases = normalize_amount(m.group(1))
 
@@ -206,6 +245,94 @@ def extract_bank_of_america_summary(text: str):
     return spend_total, payments_credits
 
 
+def extract_amex_summary(text: str) -> Tuple[Optional[float], Optional[float], Optional[float]]:
+    """
+    Returns (statement_balance, payments_credits_total, spend_total)
+
+    Intended behavior (per your example):
+      - statement_balance = 612.08
+      - payments_credits_total = 869.39   (Pay Over Time and/or Cash Advance section)
+      - spend_total = 636.18              (Account Total section, New Charges)
+    """
+    if not text:
+        return None, None, None
+
+    # Normalize whitespace to make regex more reliable across PDF extraction quirks
+    t = re.sub(r"[ \t]+", " ", text)
+    t = re.sub(r"\r", "\n", t)
+
+    statement_balance = None
+    payments_credits_total = None
+    spend_total = None
+
+    # ------------------------------------------------------------
+    # 1) Statement Balance: prefer "Pay Over Time and/or Cash Advance" New Balance
+    # ------------------------------------------------------------
+    m = re.search(
+        r"Pay Over Time and/or Cash Advance.*?"
+        r"New Balance\s*=\s*\$?([\d,]+\.\d{2})",
+        t,
+        flags=re.IGNORECASE | re.DOTALL,
+    )
+    if m:
+        statement_balance = _money_to_float(m.group(1))
+    else:
+        # Fallback: the big "New Balance" box often appears as "New Balance $612.08"
+        m2 = re.search(r"\bNew Balance\b\s*\$?([\d,]+\.\d{2})", t, flags=re.IGNORECASE)
+        if m2:
+            statement_balance = _money_to_float(m2.group(1))
+
+    # ------------------------------------------------------------
+    # 2) Payments/Credits total: prefer Pay Over Time and/or Cash Advance Payments/Credits
+    #    Example shows: Payments/Credits -$869.39
+    # ------------------------------------------------------------
+    m = re.search(
+        r"Pay Over Time and/or Cash Advance.*?"
+        r"Payments/Credits\s*-\s*\$?([\d,]+\.\d{2})",
+        t,
+        flags=re.IGNORECASE | re.DOTALL,
+    )
+    if m:
+        payments_credits_total = _money_to_float(m.group(1))
+    else:
+        # Fallback: Account Total Payments/Credits -$881.44
+        m2 = re.search(
+            r"Account Total.*?"
+            r"Payments/Credits\s*-\s*\$?([\d,]+\.\d{2})",
+            t,
+            flags=re.IGNORECASE | re.DOTALL,
+        )
+        if m2:
+            payments_credits_total = _money_to_float(m2.group(1))
+
+    # ------------------------------------------------------------
+    # 3) Total purchases/charges/spend (Amex)
+    # ------------------------------------------------------------
+
+    # Primary: Account Total -> New Charges (page 1 layout)
+    m = re.search(
+        r"Account Total.*?"
+        r"New Charges\s*\+?\s*\$?\s*([\d,]+\.\d{2})",
+        t,
+        flags=re.IGNORECASE | re.DOTALL,
+    )
+    if m:
+        spend_total = _money_to_float(m.group(1))
+    else:
+        # Fallback: "Total New Charges $12.05 $624.13 $636.18"
+        # Rule: take the LAST dollar amount on that line
+        m2 = re.search(
+            r"^.*Total New Charges.*$",
+            t,
+            flags=re.IGNORECASE | re.MULTILINE,
+        )
+        if m2:
+            amounts = re.findall(r"\$[\d,]+\.\d{2}", m2.group(0))
+            if amounts:
+                spend_total = _money_to_float(amounts[-1])
+
+
+    return statement_balance, payments_credits_total, spend_total
 
 # =============================
 # Section detection (rows only)

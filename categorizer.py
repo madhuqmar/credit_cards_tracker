@@ -36,19 +36,14 @@ def categorize_transaction(merchant: str):
     if "bethesda bagels" in m or "bagel" in m:
         return "Food", "Breakfast"
 
+    if "uber eats" in m:
+        return "Food", "Delivery"
 
     # -------------------------
     # INTEREST / FEES
     # -------------------------
     if "interest" in m or (("fee" in m or "fees" in m)):
         return "Anomalies", "Interest / Fees"
-
-    # -------------------------
-    # FOOD DELIVERY
-    # -------------------------
-    if "uber eats" in m:
-        return "Food Delivery", "Uber Eats"
-
 
     # -------------------------
     # GROOMING
@@ -58,6 +53,10 @@ def categorize_transaction(merchant: str):
 
     if "silver mirror" in m or "facial" in m:
         return "Grooming", "Facials/Skin"
+    
+    if "gloss bar" in m:
+        return "Grooming", "Hair"
+
 
     # -------------------------
     # DINING
@@ -72,7 +71,7 @@ def categorize_transaction(merchant: str):
         "bistro",
         "grill"
     ]):
-        return "Dining", "Restaurants"
+        return "Food", "Dining"
 
     # -------------------------
     # GROCERIES
@@ -155,13 +154,16 @@ def categorize_transaction(merchant: str):
     # -------------------------
     # SHOPPING
     # -------------------------
-    if "ann taylor" in m:
+    
+    if any(x in m for x in [
+        "ann taylor",
+        "skims",
+        "reformation"
+    ]):
         return "Shopping", "Clothes"
 
     if any(x in m for x in [
         "sephora",
-        "skims",
-        "reformation",
         "wayfair",
         "amazon"
     ]):
