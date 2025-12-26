@@ -62,6 +62,11 @@ def _money_to_float(s: str) -> float:
 def detect_bank_type_from_filename(card_name: str) -> str:
     name = card_name.lower()
 
+    # Apple Card (Goldman Sachs)
+    if "apple card" in name or "applecard" in name or "apple_card" in name:
+        return "apple"
+
+
     # Amex
     amex_month = r"(jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)"
     if (
@@ -334,6 +339,98 @@ def extract_amex_summary(text: str) -> Tuple[Optional[float], Optional[float], O
 
     return statement_balance, payments_credits_total, spend_total
 
+
+def extract_apple_statement_balance(pdf) -> Optional[float]:
+    """
+    Apple Card (Goldman Sachs): extract ONLY the statement balance from page 1.
+
+    Strategy (in order):
+      1) Prefer 'Total Balance $X.XX' (stable and unambiguous)
+      2) Fallback: the big summary block 'Your <Month> Balance ...' and take the FIRST $ amount
+         (because that line also contains minimum payment and due date context)
+      3) Never match 'Previous Monthly Balance' or 'Previous Total Balance'
+    """
+    if pdf is None or not getattr(pdf, "pages", None) or len(pdf.pages) == 0:
+        return None
+
+    text = pdf.pages[0].extract_text() or ""
+    if not text.strip():
+        return None
+
+    # Normalize whitespace to reduce PDF extraction variance
+    t = re.sub(r"[ \t]+", " ", text)
+    t = re.sub(r"\r", "\n", t)
+
+    def _to_float(s: str) -> float:
+        return float(s.replace("$", "").replace(",", "").strip())
+
+    # 1) Strongest signal: "Total Balance $767.74"
+    m = re.search(
+    r"(?im)^\s*Total Balance\s*\$([\d,]+\.\d{2})\s*$",
+    t,
+)
+
+    if m:
+        return _to_float(m.group(1))
+
+    return None
+
+def extract_apple_total_payments(pdf) -> Optional[float]:
+    """
+    Extract total payments from the Apple Card 'Payments' table section.
+    Source of truth:
+        'Total payments for this period   -$X.XX'
+    Returns positive magnitude (e.g. 937.09)
+    """
+    if pdf is None or not getattr(pdf, "pages", None):
+        return None
+
+    text = "\n".join(page.extract_text() or "" for page in pdf.pages)
+
+    # Normalize whitespace
+    t = re.sub(r"[ \t]+", " ", text)
+    t = re.sub(r"\r", "\n", t)
+
+    m = re.search(
+        r"(?im)^Total payments for this period\s+-?\$([\d,]+\.\d{2})\s*$",
+        t,
+    )
+
+    if not m:
+        return None
+
+    return float(m.group(1).replace(",", ""))
+
+def extract_apple_total_spend(pdf) -> Optional[float]:
+    """
+    Extract total purchases / spend from the Apple Card Transactions section.
+
+    Source of truth:
+        'Total charges, credits and returns   $X.XX'
+
+    Returns positive magnitude (e.g. 757.14)
+    """
+    if pdf is None or not getattr(pdf, "pages", None):
+        return None
+
+    text = "\n".join(page.extract_text() or "" for page in pdf.pages)
+
+    # Normalize whitespace
+    t = re.sub(r"[ \t]+", " ", text)
+    t = re.sub(r"\r", "\n", t)
+
+    m = re.search(
+        r"(?im)^Total charges, credits and returns\s+\$([\d,]+\.\d{2})\s*$",
+        t,
+    )
+
+    if not m:
+        return None
+
+    return float(m.group(1).replace(",", ""))
+
+
+
 # =============================
 # Section detection (rows only)
 # =============================
@@ -353,3 +450,5 @@ def detect_section_header(line: str):
         if any(k in l for k in keys):
             return section
     return None
+
+

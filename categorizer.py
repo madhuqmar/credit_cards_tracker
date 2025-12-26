@@ -106,17 +106,6 @@ def categorize_transaction(merchant: str):
         return "Transportation", "Metro"
 
     # -------------------------
-    # HEALTH / FITNESS
-    # -------------------------
-    if any(x in m for x in [
-        "classpass",
-        "ouraring",
-        "oura ring",
-        "oura"
-    ]):
-        return "Health / Fitness", "Subscriptions"
-
-    # -------------------------
     # SUBSCRIPTIONS
     # -------------------------
     if any(x in m for x in [
@@ -124,14 +113,27 @@ def categorize_transaction(merchant: str):
         "prime video channels",
         "netflix",
         "apple.com",
+        "google one"
+    ]):
+        return "Subscriptions", "Digital Services"
+    
+    if any(x in m for x in [
+        "classpass",
+        "ouraring",
+        "oura ring",
+        "oura"
+    ]):
+        return "Subscriptions", "Health / Fitness"
+    
+
+    if any(x in m for x in [
         "canva",
         "figma",
         "github",
         "gamma",
         "midjourney",
-        "google one"
     ]):
-        return "Subscriptions", "Digital Services"
+        return "Subscriptions", "Code / Design"
 
     # -------------------------
     # BUSINESS

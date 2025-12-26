@@ -15,6 +15,9 @@ from parser_utils import (
     extract_discover_summary,
     extract_bank_of_america_summary,
     extract_amex_summary,
+    extract_apple_statement_balance,
+    extract_apple_total_payments,
+    extract_apple_total_spend,
     parse_date,
 )
 
@@ -277,7 +280,8 @@ def extract_transactions_from_pdf(pdf_file, card_name: str) -> pd.DataFrame:
             "payment received",
             "internet payment",
             "credit adjustment",
-            "points for statement credit"
+            "points for statement credit",
+            "ach deposit"
         ]
 
         merchant_lower = merchant.lower()
@@ -342,7 +346,12 @@ def extract_transactions_from_pdf(pdf_file, card_name: str) -> pd.DataFrame:
 
     elif bank_type == "amex":
         statement_balance, payments_credits_total, spend_total = extract_amex_summary(text)
-        
+
+    if bank_type == "apple":
+        statement_balance = extract_apple_statement_balance(pdf)
+        payments_credits_total = extract_apple_total_payments(pdf)
+        spend_total = extract_apple_total_spend(pdf)
+
 
     else:
         spend_total = df[df["transaction_type"] == "spend"]["amount"].sum()
