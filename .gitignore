@@ -60,3 +60,6 @@ htmlcov/
 
 # Jupyter Notebook
 .ipynb_checkpoints
+
+
+.streamlit/
