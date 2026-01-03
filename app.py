@@ -3,6 +3,13 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 
+# Mock add_auth if st-paywall is broken with current streamlit version
+try:
+    from st_paywall import add_auth
+except ImportError:
+    def add_auth(required=False):
+        pass
+
 from parser import extract_transactions_from_pdf
 from categorizer import categorize_transaction
 
@@ -12,102 +19,170 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS for feminine styling
+# # Add paywall - users need to subscribe to access the app
+# try:
+#     add_auth(required=True)
+# except Exception as e:
+#     st.error(f"Paywall Error: {e}")
+#     st.info("Please ensure you have configured your .streamlit/secrets.toml correctly.")
+#     # Fallback for development if paywall fails
+#     if st.secrets.get("testing_mode", False):
+#         st.warning("Running in testing mode without paywall.")
+#     else:
+#         st.stop()
+
+# Custom CSS for minimalist luxury styling
 st.markdown("""
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=Poppins:wght@300;400;500;600;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400&display=swap');
     
-    .main {
-        background: linear-gradient(135deg, #ffeef8 0%, #ffe4f3 25%, #ffd4f0 50%, #ffc9ed 75%, #ffbeea 100%);
-        font-family: 'Poppins', sans-serif;
+    [data-testid="stAppViewContainer"], [data-testid="stHeader"], .main {
+        background-color: #CDE8DD !important;
+        font-family: 'Playfair Display', serif;
+        color: #092E19;
     }
     
     .stMetric {
-        background: white;
-        padding: 15px;
-        border-radius: 15px;
-        box-shadow: 0 4px 15px rgba(255, 182, 236, 0.2);
-        border: 1px solid rgba(255, 192, 240, 0.3);
+        background: #F1F8F6;
+        padding: 20px;
+        border-radius: 0px;
+        box-shadow: none;
+        border: none;
     }
     
     h1 {
-        color: #8b7d9b;
+        color: #092E19;
         font-family: 'Playfair Display', serif;
-        font-weight: 700;
-        letter-spacing: 0.5px;
-        text-align: center;
-        font-size: 3rem !important;
-        margin-bottom: 0.5rem;
+        font-weight: 900;
+        letter-spacing: -1px;
+        text-align: left;
+        font-size: 3.5rem !important;
+        margin-bottom: 2rem;
+        text-transform: lowercase;
+        font-style: italic;
     }
     
     h2 {
-        color: #c239b7;
+        color: #0F462D;
         font-family: 'Playfair Display', serif;
         font-weight: 700;
-        margin-top: 2rem;
-        font-size: 2rem !important;
+        margin-top: 3rem;
+        font-size: 2.2rem !important;
+        border-bottom: 1px solid #175C44;
+        padding-bottom: 10px;
+        display: inline-block;
     }
     
     h3 {
-        color: #ff6b9d;
-        font-family: 'Poppins', sans-serif;
-        font-weight: 600;
-        font-size: 1.3rem !important;
+        color: #175C44;
+        font-family: 'Playfair Display', serif;
+        font-weight: 500;
+        font-size: 1.1rem !important;
+        text-transform: uppercase;
+        letter-spacing: 2px;
     }
     
     .stDataFrame {
-        border-radius: 15px;
+        border-radius: 0px;
         overflow: hidden;
-        box-shadow: 0 8px 20px rgba(255, 182, 236, 0.25);
-        border: 2px solid rgba(255, 192, 240, 0.3);
+        box-shadow: none;
+        border: 1px solid #80C1B2;
     }
     
     .stButton>button {
-        background: linear-gradient(135deg, #ff6b9d 0%, #c239b7 100%);
-        color: white;
-        border-radius: 25px;
-        border: none;
-        padding: 12px 30px;
-        font-weight: 600;
-        font-family: 'Poppins', sans-serif;
-        box-shadow: 0 4px 15px rgba(255, 107, 157, 0.3);
-        transition: all 0.3s ease;
+        background: #092E19;
+        color: #FFFFFF;
+        border-radius: 0px;
+        border: 1px solid #092E19;
+        padding: 15px 40px;
+        font-weight: 400;
+        font-family: 'Playfair Display', serif;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        transition: all 0.4s cubic-bezier(0.165, 0.84, 0.44, 1);
     }
     
     .stButton>button:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 6px 20px rgba(255, 107, 157, 0.4);
+        background: #369692;
+        color: #FFFFFF;
+        border-color: #369692;
+        transform: none;
+        box-shadow: none;
     }
     
     .stSelectbox, .stNumberInput {
-        font-family: 'Poppins', sans-serif;
+        font-family: 'Playfair Display', serif;
+    }
+
+    /* Refined minimalist input and option boxes */
+    div[data-baseweb="input"], div[data-baseweb="select"] {
+        background-color: transparent !important;
+        border: none !important;
+        border-bottom: 2px solid #175C44 !important;
+        border-radius: 0px !important;
+        transition: all 0.3s ease;
+    }
+
+    div[data-baseweb="input"]:focus-within, div[data-baseweb="select"]:focus-within {
+        border-bottom-color: #369692 !important;
+        background-color: rgba(255, 255, 255, 0.1) !important;
+    }
+
+    /* Style the file uploader to be more integrated */
+    [data-testid="stFileUploader"] section {
+        background-color: rgba(255, 255, 255, 0.2) !important;
+        border: 1px solid #175C44 !important;
+        border-radius: 0px !important;
+        padding: 1.5rem !important;
+    }
+
+    [data-testid="stFileUploader"] {
+        border: none !important;
+    }
+
+    /* Style the dropdown menu items */
+    div[data-baseweb="popover"] ul {
+        background-color: #F1F8F6 !important;
+        border: 1px solid #175C44 !important;
+        border-radius: 0px !important;
+    }
+
+    div[data-baseweb="popover"] li {
+        color: #092E19 !important;
+        font-family: 'Playfair Display', serif !important;
+    }
+
+    div[data-baseweb="popover"] li:hover {
+        background-color: #CDE8DD !important;
     }
     
     hr {
         border: none;
-        height: 2px;
-        background: linear-gradient(90deg, transparent, #ffc9ed, transparent);
-        margin: 2rem 0;
+        height: 1px;
+        background: #80C1B2;
+        margin: 3rem 0;
+    }
+
+    /* Custom card styling for metrics */
+    .metric-card {
+        background: #F1F8F6;
+        padding: 25px;
+        border: none;
+        text-align: left;
+    }
+
+    /* Remove the white outline/halo from Sankey labels */
+    .js-plotly-plot .plotly text, 
+    .js-plotly-plot .plotly tspan {
+        text-shadow: none !important;
+        stroke: none !important;
+        stroke-width: 0 !important;
+        paint-order: markers fill stroke !important;
     }
 </style>
 """, unsafe_allow_html=True)
 
-st.title("✨ Credit Card Statements Analyzer")
-
-# -----------------------------
-# BUDGET INPUT
-# -----------------------------
-st.markdown("### 💰 Monthly Budget Goal")
-st.markdown("*Set your spending limit and track your progress*")
-BUDGET = st.number_input(
-    "Your budget target:",
-    min_value=0,
-    value=2300,
-    step=100,
-    help="✨ Set your monthly spending goal"
-)
-
-st.divider()
+st.title("statements simplified ✨")
 
 # -----------------------------
 # FILE UPLOAD
@@ -176,17 +251,6 @@ for pdf in uploaded_files:
 data = pd.concat(frames, ignore_index=True)
 
 # -----------------------------
-# DEBUG: Show uploaded files
-# -----------------------------
-with st.expander(f"📋 Uploaded Files ({len(all_uploaded_cards)})"):
-    st.write(all_uploaded_cards)
-    st.write(f"Unique cards in data: {sorted(data['card'].unique().tolist())}")
-
-# Note: We now keep payments in the data! They're marked as transaction_type="credit"
-# and will be separated in the display tables below.
-
-
-# -----------------------------
 # TRANSPORT PROVIDER (BACKWARD COMPATIBLE)
 # -----------------------------
 def transport_provider(row):
@@ -196,107 +260,70 @@ def transport_provider(row):
 
 data["transport_provider"] = data.apply(transport_provider, axis=1)
 
-# -----------------------------
-# METRICS
-# -----------------------------
 # Calculate total spend (positive amounts only) and total credits/payments (negative amounts)
 total_balance = sum(v for v in statement_balances.values() if isinstance(v, (int, float)))
-budget_diff = BUDGET - total_balance
-pct_used = total_balance / BUDGET if BUDGET > 0 else 0
 
 # -----------------------------
-# MONTHLY SNAPSHOT
+# BUDGET & BAROMETER
 # -----------------------------
-st.markdown("## 📊 Monthly Snapshot")
-st.markdown("*Your spending story at a glance*")
+st.divider()
+col_budget, col_gauge = st.columns([1, 2])
 
-k1, k2, k3, k4, k5 = st.columns(5)
-
-with k1:
-    st.markdown(f"""
-    <div style='text-align: center; padding: 18px; background: linear-gradient(135deg, #f8f9fa 0%, #f3f4f6 100%); border-radius: 20px; box-shadow: 0 4px 15px rgba(139, 125, 155, 0.15); border: 2px solid #e5e7eb;'>
-        <div style='color: #9ca3af; font-size: 13px; font-weight: 600; margin-bottom: 10px; letter-spacing: 1px;'>💳 TOTAL BALANCE</div>
-        <div style='color: #8b7d9b; font-size: 32px; font-weight: 700;'>${total_balance:,.2f}</div>
-    </div>
-    """, unsafe_allow_html=True)
-
-with k2:
-    st.markdown(f"""
-    <div style='text-align: center; padding: 18px; background: linear-gradient(135deg, #f8f9fa 0%, #f3f4f6 100%); border-radius: 20px; box-shadow: 0 4px 15px rgba(139, 125, 155, 0.15); border: 2px solid #e5e7eb;'>
-        <div style='color: #9ca3af; font-size: 13px; font-weight: 600; margin-bottom: 10px; letter-spacing: 1px;'>🎯 BUDGET GOAL</div>
-        <div style='color: #8b7d9b; font-size: 32px; font-weight: 700;'>${BUDGET:,.0f}</div>
-    </div>
-    """, unsafe_allow_html=True)
-
-with k3:
-    color = '#a8a095' if pct_used <= 0.7 else '#d4a574' if pct_used > 1 else '#8b7d9b'
-    st.markdown(f"""
-    <div style='text-align: center; padding: 18px; background: linear-gradient(135deg, #f8f9fa 0%, #f3f4f6 100%); border-radius: 20px; box-shadow: 0 4px 15px rgba(139, 125, 155, 0.15); border: 2px solid #e5e7eb;'>
-        <div style='color: #9ca3af; font-size: 13px; font-weight: 600; margin-bottom: 10px; letter-spacing: 1px;'>📊 BUDGET USED</div>
-        <div style='color: {color}; font-size: 32px; font-weight: 700;'>{pct_used*100:.1f}%</div>
-    </div>
-    """, unsafe_allow_html=True)
-
-with k4:
-    diff_color = '#a8a095' if budget_diff >= 0 else '#d4a574'
-    diff_icon = '✨' if budget_diff >= 0 else '⚠️'
-    st.markdown(f"""
-    <div style='text-align: center; padding: 18px; background: linear-gradient(135deg, #f8f9fa 0%, #f3f4f6 100%); border-radius: 20px; box-shadow: 0 4px 15px rgba(139, 125, 155, 0.15); border: 2px solid #e5e7eb;'>
-        <div style='color: #9ca3af; font-size: 13px; font-weight: 600; margin-bottom: 10px; letter-spacing: 1px;'>{diff_icon} DIFFERENCE</div>
-        <div style='color: {diff_color}; font-size: 32px; font-weight: 700;'>{"$" + f"{budget_diff:,.2f}" if budget_diff >= 0 else "-$" + f"{abs(budget_diff):,.2f}"}</div>
-    </div>
-    """, unsafe_allow_html=True)
-
-with k5:
+with col_budget:
+    st.markdown("### 💰 Monthly Budget Goal")
+    st.markdown("*Set your spending limit and track your progress*")
+    BUDGET = st.number_input(
+        "Your budget target:",
+        min_value=0,
+        value=2300,
+        step=100,
+        help="✨ Set your monthly spending goal"
+    )
+    
+    budget_diff = BUDGET - total_balance
+    pct_used = total_balance / BUDGET if BUDGET > 0 else 0
+    
     status_text = "On Track" if budget_diff >= 0 else "Over Budget"
-    status_color = '#a8a095' if budget_diff >= 0 else '#d4a574'
-    status_icon = '✓' if budget_diff >= 0 else '⚠️'
+    status_color = "#175C44" if budget_diff >= 0 else "#092E19"
+    
     st.markdown(f"""
-    <div style='text-align: center; padding: 18px; background: linear-gradient(135deg, #f8f9fa 0%, #f3f4f6 100%); border-radius: 20px; box-shadow: 0 4px 15px rgba(139, 125, 155, 0.15); border: 2px solid #e5e7eb;'>
-        <div style='color: #9ca3af; font-size: 13px; font-weight: 600; margin-bottom: 10px; letter-spacing: 1px;'>� STATUS</div>
-        <div style='color: #8b7d9b; font-size: 20px; font-weight: 600;'>{status_icon}<br/>{status_text}</div>
+    <div style='margin-top: 20px; padding: 20px; border: none; background: #F1F8F6;'>
+        <div style='color: #369692; font-size: 11px; font-weight: 500; letter-spacing: 2px; text-transform: uppercase;'>Current Status</div>
+        <div style='color: {status_color}; font-size: 24px; font-weight: 700; font-family: "Playfair Display", serif; font-style: italic;'>{status_text}</div>
+        <div style='color: #092E19; font-size: 14px; margin-top: 5px;'>
+            {"Remaining: $" + f"{budget_diff:,.2f}" if budget_diff >= 0 else "Over by: $" + f"{abs(budget_diff):,.2f}"}
+        </div>
     </div>
     """, unsafe_allow_html=True)
 
-# -----------------------------
-# BIG BUDGET BAROMETER
-# -----------------------------
-st.markdown("## � Budget Tracker")
-st.markdown("*See how you're doing this month!*")
-
-gauge = go.Figure(go.Indicator(
-    mode="gauge+number",
-    value=total_balance,
-    number={"prefix": "$", "font": {"size": 48, "color": "#8b7d9b"}},
-    gauge={
-        "axis": {"range": [0, BUDGET]},
-        "bar": {"color": "#a8a095", "thickness": 0.65},
-        "steps": [
-            {"range": [0, BUDGET * 0.7], "color": "#f8f9fa"},
-            {"range": [BUDGET * 0.7, BUDGET], "color": "#e5e7eb"}
-        ],
-        "threshold": {
-            "line": {"color": "#d4a574", "width": 6},
-            "thickness": 0.85,
-            "value": BUDGET
+with col_gauge:
+    gauge = go.Figure(go.Indicator(
+        mode="gauge+number",
+        value=total_balance,
+        number={"prefix": "$", "font": {"size": 48, "color": "#092E19", "family": "Playfair Display"}},
+        gauge={
+            "axis": {"range": [0, max(BUDGET, total_balance * 1.1)], "tickcolor": "#092E19"},
+            "bar": {"color": "#175C44", "thickness": 0.2},
+            "steps": [
+                {"range": [0, BUDGET], "color": "#F1F8F6"}
+            ],
+            "threshold": {
+                "line": {"color": "#369692", "width": 2},
+                "thickness": 0.8,
+                "value": BUDGET
+            }
         }
-    }
-))
-gauge.update_layout(
-    height=420, 
-    margin=dict(l=40, r=40, t=40, b=20),
-    paper_bgcolor='rgba(0,0,0,0)',
-    plot_bgcolor='rgba(0,0,0,0)'
-)
-st.plotly_chart(gauge, use_container_width=True)
+    ))
+    gauge.update_layout(
+        height=300, 
+        margin=dict(l=40, r=40, t=40, b=20),
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(0,0,0,0)',
+        font={'family': "Playfair Display"}
+    )
+    st.plotly_chart(gauge, width='stretch')
 
 st.divider()
-
-# -----------------------------
-# CATEGORY TOTALS
-# -----------------------------
-st.markdown("## � Spending Breakdown")
-st.markdown("*Where did all my money go? Let's find out!*")
 
 # Group by category and subcategory
 category_subcategory_totals = (
@@ -305,6 +332,132 @@ category_subcategory_totals = (
     .sum()
     .sort_values("amount", ascending=False)
 )
+
+# -----------------------------
+# SANKEY CHART - SPENDING FLOW
+# -----------------------------
+st.markdown("## 🌊 Spending Flow")
+st.markdown("*Visualize how your money flows across categories*")
+
+# Prepare data for Sankey diagram (3 levels: Total -> Category -> Subcategory)
+sankey_data = category_subcategory_totals[category_subcategory_totals["amount"] > 0].copy()
+
+# Calculate total spending
+total_spending = sankey_data["amount"].sum()
+
+# Create labels list: ["Total Spending", Categories..., Subcategories...]
+labels = ["Total Spending"]
+unique_categories = sankey_data["category"].unique().tolist()
+unique_subcategories = sankey_data["subcategory"].unique().tolist()
+labels.extend(unique_categories)
+labels.extend(unique_subcategories)
+
+# Create source, target, and value lists for the flows
+sources = []
+targets = []
+values = []
+
+# Level 1: Total Spending -> Categories
+category_totals = sankey_data.groupby("category")["amount"].sum()
+for category in unique_categories:
+    sources.append(0)  # Total Spending index
+    targets.append(labels.index(category))
+    values.append(category_totals[category])
+
+# Level 2: Categories -> Subcategories
+for _, row in sankey_data.iterrows():
+    category = row["category"]
+    subcategory = row["subcategory"]
+    amount = row["amount"]
+    
+    source_idx = labels.index(category)
+    target_idx = labels.index(subcategory)
+    
+    sources.append(source_idx)
+    targets.append(target_idx)
+    values.append(amount)
+
+# Create color scheme
+node_colors = ["#156161"]  # Total Spending - Dark Teal
+
+# Category colors - New Blue/Teal palette
+category_color_map = {
+    "Food": "#247D96",
+    "Groceries": "#3673CA",
+    "Dining": "#4A56FE",
+    "Food Delivery": "#6490FF",
+    "Transportation": "#7EBFFF",
+    "Shopping": "#98E3FF",
+    "Beauty / Grooming": "#B3FCFF",
+    "Grooming": "#247D96",
+    "Health / Fitness": "#3673CA",
+    "Subscriptions": "#4A56FE",
+    "Other": "#6490FF",
+    "Anomalies": "#156161"
+}
+
+# Add category colors
+for cat in unique_categories:
+    node_colors.append(category_color_map.get(cat, "#7EBFFF"))
+
+# Add subcategory colors (slightly more opaque)
+for subcat in unique_subcategories:
+    node_colors.append("rgba(36, 125, 150, 0.8)")
+
+# Create Sankey diagram
+fig_sankey = go.Figure(data=[go.Sankey(
+    arrangement='snap', 
+    node=dict(
+        pad=15, 
+        thickness=80, 
+        line=dict(color="#092E19", width=0),
+        label=labels, 
+        color=node_colors,
+        customdata=[f"${total_spending:,.2f}"] + 
+                   [f"${category_totals[cat]:,.2f}" for cat in unique_categories] +
+                   [f"${sankey_data[sankey_data['subcategory'] == subcat]['amount'].sum():,.2f}" 
+                    for subcat in unique_subcategories],
+        hovertemplate='<b>%{label}</b><br>Total: %{customdata}<extra></extra>',
+        hoverlabel=dict(
+            font=dict(family="Playfair Display, serif", size=12),
+            bordercolor="rgba(0,0,0,0)"
+        )
+    ),
+    link=dict(
+        source=sources,
+        target=targets,
+        value=values,
+        color="rgba(36, 125, 150, 0.2)",
+        hovertemplate='%{source.label} → %{target.label}<br>$%{value:,.2f}<extra></extra>',
+        hoverlabel=dict(
+            font=dict(family="Playfair Display, serif", size=12),
+            bordercolor="rgba(0,0,0,0)"
+        )
+    ),
+    textfont=dict(family="Playfair Display, serif", size=12, color="#092E19") 
+)])
+
+fig_sankey.update_layout(
+    title=dict(
+        text=f"spending flow: ${total_spending:,.2f}",
+        font=dict(size=28, color="#092E19", family="Playfair Display, serif")
+    ),
+    font=dict(size=14, family="Playfair Display, serif"),
+    height=600, 
+    paper_bgcolor='rgba(0,0,0,0)',
+    plot_bgcolor='rgba(0,0,0,0)',
+    margin=dict(l=40, r=40, t=80, b=40) 
+)
+
+st.plotly_chart(fig_sankey, width='stretch')
+
+st.divider()
+
+# -----------------------------
+# CATEGORY TOTALS
+# -----------------------------
+st.markdown("##  Spending Breakdown")
+st.markdown("*Where did all my money go? Let's find out!*")
 
 # =========================================================
 # ROW OF 3 SMALL CHARTS - WITH SUBCATEGORIES
@@ -325,10 +478,10 @@ with c1:
             height=300,
             color="category",
             color_discrete_map={
-                "Groceries": "#54A24B",
-                "Dining": "#F58518",
-                "Food Delivery": "#E45756",
-                "Food": "#EECA3B",
+                "Groceries": "#175C44",
+                "Dining": "#2A8477",
+                "Food Delivery": "#369692",
+                "Food": "#092E19",
             },
             labels={"amount": "Amount ($)", "subcategory": ""},
             text_auto=".2f",
@@ -339,14 +492,15 @@ with c1:
             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
             margin=dict(l=10, r=10, t=60, b=10),
             plot_bgcolor='rgba(0,0,0,0)',
-            paper_bgcolor='rgba(0,0,0,0)'
+            paper_bgcolor='rgba(0,0,0,0)',
+            font={'family': "Playfair Display", 'color': "#092E19"}
         )
         fig_food.update_traces(textposition='outside')
-        st.plotly_chart(fig_food, use_container_width=True)
+        st.plotly_chart(fig_food, width='stretch')
         
         # Add total
         food_total = food["amount"].sum()
-        st.markdown(f"<div style='text-align: center; font-size: 18px; font-weight: 600; color: #54A24B;'>Total: ${food_total:,.2f}</div>", unsafe_allow_html=True)
+        st.markdown(f"<div style='text-align: center; font-size: 18px; font-weight: 600; color: #175C44;'>Total: ${food_total:,.2f}</div>", unsafe_allow_html=True)
 
 # -------- SHOPPING & GROOMING (WITH SUBCATEGORIES) --------
 with c2:
@@ -362,9 +516,9 @@ with c2:
             height=300,
             color="category",
             color_discrete_map={
-                "Shopping": "#B279A2",
-                "Beauty / Grooming": "#FF9DA6",
-                "Grooming": "#FFB6C1"
+                "Shopping": "#175C44",
+                "Beauty / Grooming": "#2A8477",
+                "Grooming": "#369692"
             },
             labels={"amount": "Amount ($)", "subcategory": ""},
             text_auto=".2f",
@@ -375,14 +529,15 @@ with c2:
             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
             margin=dict(l=10, r=10, t=60, b=10),
             plot_bgcolor='rgba(0,0,0,0)',
-            paper_bgcolor='rgba(0,0,0,0)'
+            paper_bgcolor='rgba(0,0,0,0)',
+            font={'family': "Playfair Display", 'color': "#092E19"}
         )
         fig_lifestyle.update_traces(textposition='outside')
-        st.plotly_chart(fig_lifestyle, use_container_width=True)
+        st.plotly_chart(fig_lifestyle, width='stretch')
         
         # Add total
         lifestyle_total = lifestyle["amount"].sum()
-        st.markdown(f"<div style='text-align: center; font-size: 18px; font-weight: 600; color: #B279A2;'>Total: ${lifestyle_total:,.2f}</div>", unsafe_allow_html=True)
+        st.markdown(f"<div style='text-align: center; font-size: 18px; font-weight: 600; color: #175C44;'>Total: ${lifestyle_total:,.2f}</div>", unsafe_allow_html=True)
 
 # -------- TRANSPORT (WITH SUBCATEGORIES) --------
 with c3:
@@ -399,10 +554,10 @@ with c3:
             height=300,
             color="subcategory",
             color_discrete_map={
-                "Uber": "#4C78A8",
-                "Lyft": "#72B7B2",
-                "Metro": "#9ECAE1",
-                "Bikes": "#F58518"
+                "Uber": "#175C44",
+                "Lyft": "#2A8477",
+                "Metro": "#369692",
+                "Bikes": "#092E19"
             },
             labels={"amount": "Amount ($)", "subcategory": ""},
             text_auto=".2f",
@@ -413,14 +568,15 @@ with c3:
             showlegend=False,
             margin=dict(l=10, r=10, t=60, b=10),
             plot_bgcolor='rgba(0,0,0,0)',
-            paper_bgcolor='rgba(0,0,0,0)'
+            paper_bgcolor='rgba(0,0,0,0)',
+            font={'family': "Playfair Display", 'color': "#092E19"}
         )
         fig_transport.update_traces(textposition='outside')
-        st.plotly_chart(fig_transport, use_container_width=True)
+        st.plotly_chart(fig_transport, width='stretch')
         
         # Add total
         transport_total = transport["amount"].sum()
-        st.markdown(f"<div style='text-align: center; font-size: 18px; font-weight: 600; color: #4C78A8;'>Total: ${transport_total:,.2f}</div>", unsafe_allow_html=True)
+        st.markdown(f"<div style='text-align: center; font-size: 18px; font-weight: 600; color: #175C44;'>Total: ${transport_total:,.2f}</div>", unsafe_allow_html=True)
 
 st.divider()
 
@@ -468,53 +624,63 @@ top_emoji = category_emojis.get(top_category, "🎯")
 
 m1, m2, m3, m4, m5 = st.columns(5)
 
-# Column 1: Total Transactions with fun styling
+# Column 1: Total Transactions
 with m1:
     st.markdown(f"""
-    <div style='text-align: center; padding: 25px; background: linear-gradient(135deg, #c9b8d4 0%, #b5a4c7 100%); border-radius: 20px; box-shadow: 0 8px 20px rgba(139, 125, 155, 0.3); height: 220px; display: flex; flex-direction: column; justify-content: center;'>
-        <div style='font-size: 56px; margin-bottom: 10px;'>🛒</div>
-        <div style='color: white; font-size: 42px; font-weight: 700; margin-bottom: 8px; text-shadow: 2px 2px 4px rgba(0,0,0,0.15);'>{total_transactions:,}</div>
-        <div style='color: rgba(255,255,255,0.95); font-size: 13px; text-transform: uppercase; letter-spacing: 2px; font-weight: 600;'>Purchases</div>
+    <div style='text-align: left; padding: 25px; background: #F1F8F6; border: none; height: 200px; display: flex; flex-direction: column; justify-content: space-between;'>
+        <div style='color: #369692; font-size: 10px; font-weight: 500; letter-spacing: 2px; text-transform: uppercase;'>Volume</div>
+        <div>
+            <div style='color: #092E19; font-size: 42px; font-weight: 400; font-family: "Playfair Display", serif;'>{total_transactions:,}</div>
+            <div style='color: #175C44; font-size: 12px; text-transform: lowercase; font-style: italic;'>purchases</div>
+        </div>
     </div>
     """, unsafe_allow_html=True)
 
-# Column 2: Total Spend with gradient
+# Column 2: Total Spend
 with m2:
     st.markdown(f"""
-    <div style='text-align: center; padding: 25px; background: linear-gradient(135deg, #b8a8c7 0%, #a394b3 100%); border-radius: 20px; box-shadow: 0 8px 20px rgba(139, 125, 155, 0.3); height: 220px; display: flex; flex-direction: column; justify-content: center;'>
-        <div style='font-size: 56px; margin-bottom: 10px;'>💰</div>
-        <div style='color: white; font-size: 42px; font-weight: 700; margin-bottom: 8px; text-shadow: 2px 2px 4px rgba(0,0,0,0.15);'>${total_spend:,.0f}</div>
-        <div style='color: rgba(255,255,255,0.95); font-size: 13px; text-transform: uppercase; letter-spacing: 2px; font-weight: 600;'>Total Spent</div>
+    <div style='text-align: left; padding: 25px; background: #F1F8F6; border: none; height: 200px; display: flex; flex-direction: column; justify-content: space-between;'>
+        <div style='color: #369692; font-size: 10px; font-weight: 500; letter-spacing: 2px; text-transform: uppercase;'>Expenditure</div>
+        <div>
+            <div style='color: #092E19; font-size: 42px; font-weight: 400; font-family: "Playfair Display", serif;'>${total_spend:,.0f}</div>
+            <div style='color: #175C44; font-size: 12px; text-transform: lowercase; font-style: italic;'>total spent</div>
+        </div>
     </div>
     """, unsafe_allow_html=True)
 
 # Column 3: Average Transaction
 with m3:
     st.markdown(f"""
-    <div style='text-align: center; padding: 25px; background: linear-gradient(135deg, #a898b7 0%, #9484a3 100%); border-radius: 20px; box-shadow: 0 8px 20px rgba(139, 125, 155, 0.3); height: 220px; display: flex; flex-direction: column; justify-content: center;'>
-        <div style='font-size: 56px; margin-bottom: 10px;'>📊</div>
-        <div style='color: white; font-size: 42px; font-weight: 700; margin-bottom: 8px; text-shadow: 2px 2px 4px rgba(0,0,0,0.15);'>${avg_transaction:,.0f}</div>
-        <div style='color: rgba(255,255,255,0.95); font-size: 13px; text-transform: uppercase; letter-spacing: 2px; font-weight: 600;'>Avg Purchase</div>
+    <div style='text-align: left; padding: 25px; background: #F1F8F6; border: none; height: 200px; display: flex; flex-direction: column; justify-content: space-between;'>
+        <div style='color: #369692; font-size: 10px; font-weight: 500; letter-spacing: 2px; text-transform: uppercase;'>Average</div>
+        <div>
+            <div style='color: #092E19; font-size: 42px; font-weight: 400; font-family: "Playfair Display", serif;'>${avg_transaction:,.0f}</div>
+            <div style='color: #175C44; font-size: 12px; text-transform: lowercase; font-style: italic;'>per purchase</div>
+        </div>
     </div>
     """, unsafe_allow_html=True)
 
 # Column 4: Top Category
 with m4:
     st.markdown(f"""
-    <div style='text-align: center; padding: 25px; background: linear-gradient(135deg, #9888a7 0%, #8b7d9b 100%); border-radius: 20px; box-shadow: 0 8px 20px rgba(139, 125, 155, 0.3); height: 220px; display: flex; flex-direction: column; justify-content: center;'>
-        <div style='font-size: 56px; margin-bottom: 10px;'>{top_emoji}</div>
-        <div style='color: white; font-size: 26px; font-weight: 700; margin-bottom: 8px; text-shadow: 2px 2px 4px rgba(0,0,0,0.15); line-height: 1.2;'>{top_category}</div>
-        <div style='color: rgba(255,255,255,0.95); font-size: 13px; text-transform: uppercase; letter-spacing: 2px; font-weight: 600;'>{top_category_count} times</div>
+    <div style='text-align: left; padding: 25px; background: #F1F8F6; border: none; height: 200px; display: flex; flex-direction: column; justify-content: space-between;'>
+        <div style='color: #369692; font-size: 10px; font-weight: 500; letter-spacing: 2px; text-transform: uppercase;'>Focus</div>
+        <div>
+            <div style='color: #092E19; font-size: 42px; font-weight: 400; font-family: "Playfair Display", serif; line-height: 1.1;'>{top_category}</div>
+            <div style='color: #175C44; font-size: 12px; text-transform: lowercase; font-style: italic;'>{top_category_count} transactions</div>
+        </div>
     </div>
     """, unsafe_allow_html=True)
 
 # Column 5: Highest Transaction
 with m5:
     st.markdown(f"""
-    <div style='text-align: center; padding: 25px; background: linear-gradient(135deg, #8b7d9b 0%, #7d6f8b 100%); border-radius: 20px; box-shadow: 0 8px 20px rgba(139, 125, 155, 0.3); height: 220px; display: flex; flex-direction: column; justify-content: center;'>
-        <div style='font-size: 56px; margin-bottom: 10px;'>👑</div>
-        <div style='color: white; font-size: 42px; font-weight: 700; margin-bottom: 8px; text-shadow: 2px 2px 4px rgba(0,0,0,0.15);'>${max_amount:,.0f}</div>
-        <div style='color: rgba(255,255,255,0.95); font-size: 13px; text-transform: uppercase; letter-spacing: 2px; font-weight: 600;'>Splurge Alert</div>
+    <div style='text-align: left; padding: 25px; background: #F1F8F6; border: none; height: 200px; display: flex; flex-direction: column; justify-content: space-between;'>
+        <div style='color: #369692; font-size: 10px; font-weight: 500; letter-spacing: 2px; text-transform: uppercase;'>Peak</div>
+        <div>
+            <div style='color: #092E19; font-size: 42px; font-weight: 400; font-family: "Playfair Display", serif;'>${max_amount:,.0f}</div>
+            <div style='color: #175C44; font-size: 12px; text-transform: lowercase; font-style: italic;'>single splurge</div>
+        </div>
     </div>
     """, unsafe_allow_html=True)
 
@@ -545,7 +711,7 @@ with f2:
 
 with f3:
     st.markdown("<br/>", unsafe_allow_html=True)  # Spacer
-    if st.button("🔄 Reset Filters", use_container_width=True):
+    if st.button("🔄 Reset Filters", width='stretch'):
         st.rerun()
 
 # --- Apply filters ---
@@ -573,10 +739,10 @@ if selected_card != 'All':
     filter_label += f" • {selected_card}"
 
 st.markdown(f"""
-<div style='background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 20px; border-radius: 12px; margin: 20px 0; box-shadow: 0 4px 12px rgba(102,126,234,0.3);'>
-    <div style='color: rgba(255,255,255,0.9); font-size: 14px; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 8px;'>{filter_label}</div>
-    <div style='color: white; font-size: 48px; font-weight: 800; text-shadow: 2px 2px 4px rgba(0,0,0,0.2);'>${filtered_spend.amount.sum():,.2f}</div>
-    <div style='color: rgba(255,255,255,0.85); font-size: 16px; margin-top: 8px;'>{len(filtered_spend)} transactions</div>
+<div style='background: linear-gradient(135deg, #175C44 0%, #80C1B2 100%); padding: 30px; border-radius: 0px; margin: 20px 0; border: none;'>
+    <div style='color: rgba(255,255,255,0.8); font-size: 12px; text-transform: uppercase; letter-spacing: 3px; margin-bottom: 12px; font-weight: 500;'>{filter_label}</div>
+    <div style='color: #FFFFFF; font-size: 52px; font-weight: 400; font-family: "Playfair Display", serif;'>${filtered_spend.amount.sum():,.2f}</div>
+    <div style='color: rgba(255,255,255,0.7); font-size: 14px; margin-top: 10px; font-style: italic;'>{len(filtered_spend)} transactions</div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -608,7 +774,7 @@ display_df = pd.concat([display_df, total_row], ignore_index=True)
 
 st.dataframe(
     display_df,
-    use_container_width=True,
+    width='stretch',
     height=420
 )
 
@@ -623,7 +789,7 @@ with col2:
         data.to_csv(index=False),
         "monthly_transactions.csv",
         "text/csv",
-        use_container_width=True,
+        width='stretch',
         help="Export all transaction data to CSV format"
     )
 
@@ -673,7 +839,7 @@ display_balance_df = pd.concat([display_balance_df, total_row], ignore_index=Tru
 
 st.dataframe(
     display_balance_df,
-    use_container_width=True,
+    width='stretch',
     height=220,
     hide_index=True
 )
@@ -722,7 +888,7 @@ display_payments_df = pd.concat([display_payments_df, total_row_payments], ignor
 
 st.dataframe(
     display_payments_df,
-    use_container_width=True,
+    width='stretch',
     height=220
 )
 
@@ -730,7 +896,7 @@ st.dataframe(
 # -----------------------------
 # TOTAL PURCHASES BY STATEMENT
 # -----------------------------
-st.subheader("� Total Purchases by Statement")
+st.subheader("💳 Total Purchases by Statement")
 
 spend_rows = []
 
@@ -769,6 +935,6 @@ display_spend_df = pd.concat([display_spend_df, total_row_spend], ignore_index=T
 
 st.dataframe(
     display_spend_df,
-    use_container_width=True,
+    width='stretch',
     height=220
 )
