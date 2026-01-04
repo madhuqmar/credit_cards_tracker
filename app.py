@@ -301,6 +301,16 @@ if st.session_state.app_access is None:
         if stripe_link:
             st.markdown(f'<a href="{stripe_link}" target="_blank"><button style="width: 100%; background: #092E19; color: #FFFFFF; border-radius: 0px; border: 1px solid #092E19; padding: 15px 40px; font-weight: 400; font-family: \'Playfair Display\', serif; text-transform: uppercase; letter-spacing: 2px; cursor: pointer;">✨ get access</button></a>', unsafe_allow_html=True)
     
+    # Privacy disclaimer
+    st.markdown("<br/>", unsafe_allow_html=True)
+    st.markdown("""
+    <div style="text-align: center; padding: 1rem 2rem; background-color: rgba(54, 150, 146, 0.1); border: 1px solid rgba(54, 150, 146, 0.3); margin: 2rem auto; max-width: 700px; border-radius: 4px;">
+        <p style="font-size: 0.95rem; color: #0F462D; margin: 0; font-family: 'Playfair Display', serif;">
+            🔒 <strong>Your data stays with you.</strong> All processing happens in your browser. We never store or transmit your financial information.
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+    
     # Why choose us section
     st.markdown("---")
     st.markdown("""
@@ -332,7 +342,7 @@ if st.session_state.app_access is None:
     with feat3:
         st.markdown("""
         <div style="text-align: center; padding: 1rem;">
-            <div style="font-size: 3rem; margin-bottom: 1rem;">🎨</div>
+            <div style="font-size: 3rem; margin-bottom: 1rem;">💎</div>
             <h3 style="font-size: 1.2rem; color: #175C44; margin-bottom: 0.5rem; font-family: 'Playfair Display', serif;">Beautiful Design</h3>
             <p style="color: #092E19; font-size: 0.95rem; font-family: 'Playfair Display', serif;">A clean, minimalist interface that makes financial clarity enjoyable.</p>
         </div>
@@ -354,6 +364,16 @@ if st.session_state.app_access is None:
     if st.button("🔓", key="free_trial", help="Free trial (dev/testing)"):
         st.session_state.app_access = 'free_trial'
         st.rerun()
+    
+    # Disclaimer about supported credit cards at the bottom
+    st.markdown("<br/><br/>", unsafe_allow_html=True)
+    st.markdown("""
+    <div style="text-align: center; padding: 1rem 2rem; background-color: rgba(23, 92, 68, 0.1); border-left: 3px solid #175C44; margin: 2rem auto; max-width: 800px;">
+        <p style="font-size: 0.95rem; color: #0F462D; margin: 0; font-family: 'Playfair Display', serif;">
+            <strong>ℹ️ Currently supported:</strong> Citi, Bank of America, Discover, Amex, Barclays, Apple Card, and Capital One credit cards only.
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
     
     st.stop()
 
