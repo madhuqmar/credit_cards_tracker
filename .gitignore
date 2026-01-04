@@ -62,4 +62,4 @@ htmlcov/
 .ipynb_checkpoints
 
 
-.streamlit/
+.streamlit/*

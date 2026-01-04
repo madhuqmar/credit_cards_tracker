@@ -320,7 +320,8 @@ def extract_transactions_from_pdf(pdf_file, card_name: str) -> pd.DataFrame:
     )
 
     # Ensure row parsing never contributes to totals
-    payments_credits_total = 0.0
+    payments_credits_total = None
+    spend_total = None
 
     # -----------------------------
     # SUMMARY-BASED TOTALS (SOURCE OF TRUTH)
@@ -352,9 +353,11 @@ def extract_transactions_from_pdf(pdf_file, card_name: str) -> pd.DataFrame:
         payments_credits_total = extract_apple_total_payments(pdf)
         spend_total = extract_apple_total_spend(pdf)
 
-
-    else:
+    # If summary extraction returned None (or wasn't run), calculate from rows
+    if spend_total is None:
         spend_total = df[df["transaction_type"] == "spend"]["amount"].sum()
+        
+    if payments_credits_total is None:
         payments_credits_total = abs(
             df[df["transaction_type"] == "credit"]["amount"].sum()
         )

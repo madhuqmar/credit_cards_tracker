@@ -14,22 +14,18 @@ from parser import extract_transactions_from_pdf
 from categorizer import categorize_transaction
 
 st.set_page_config(
-    page_title="Credit Card Spend Dashboard",
+    page_title="Statements Simplified - Your Financial Clarity",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="collapsed"
 )
 
-# # Add paywall - users need to subscribe to access the app
-# try:
-#     add_auth(required=True)
-# except Exception as e:
-#     st.error(f"Paywall Error: {e}")
-#     st.info("Please ensure you have configured your .streamlit/secrets.toml correctly.")
-#     # Fallback for development if paywall fails
-#     if st.secrets.get("testing_mode", False):
-#         st.warning("Running in testing mode without paywall.")
-#     else:
-#         st.stop()
+# Initialize session state for app access
+if 'app_access' not in st.session_state:
+    st.session_state.app_access = None  # None, 'free_trial', or 'paid'
+if 'uploads_count' not in st.session_state:
+    st.session_state.uploads_count = 0
+if 'show_paywall' not in st.session_state:
+    st.session_state.show_paywall = False
 
 # Custom CSS for minimalist luxury styling
 st.markdown("""
@@ -179,8 +175,205 @@ st.markdown("""
         stroke-width: 0 !important;
         paint-order: markers fill stroke !important;
     }
+    
+    /* Landing page specific styles */
+    .hero-section {
+        text-align: center;
+        padding: 4rem 2rem;
+    }
+    
+    .pricing-card {
+        background: #F1F8F6;
+        padding: 2.5rem;
+        margin: 1rem;
+        border: 1px solid #175C44;
+        text-align: center;
+        transition: transform 0.3s ease;
+    }
+    
+    .pricing-card:hover {
+        transform: translateY(-5px);
+        border-color: #369692;
+    }
+    
+    .pricing-card.featured {
+        border: 2px solid #369692;
+        background: rgba(54, 150, 146, 0.1);
+    }
+    
+    .feature-list {
+        text-align: left;
+        padding: 1rem 2rem;
+    }
+    
+    .feature-list li {
+        margin: 0.8rem 0;
+        color: #092E19;
+    }
+    
+    .price {
+        font-size: 3rem;
+        font-weight: 900;
+        color: #092E19;
+        margin: 1rem 0;
+    }
+    
+    .cta-button {
+        margin-top: 1.5rem;
+    }
 </style>
 """, unsafe_allow_html=True)
+
+# -----------------------------
+# PAYWALL CHECK (after user chooses paid option)
+# -----------------------------
+if st.session_state.show_paywall and st.session_state.app_access == 'paid':
+    st.title("statements simplified ✨")
+    
+    st.markdown("""
+    <div style="text-align: center; padding: 3rem 2rem;">
+        <h2 style="font-size: 2.5rem; margin-bottom: 1rem;">Your financial clarity awaits</h2>
+        <p style="font-size: 1.3rem; color: #175C44; margin-bottom: 2rem;">
+            Transform chaos into insights. Start your journey to smarter spending.
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    try:
+        # Try to use st-paywall if available
+        from st_paywall import add_auth
+        add_auth(required=True)
+        # If we get here, authentication was successful
+        st.session_state.show_paywall = False
+        st.success("✨ Welcome! You now have full access.")
+        if st.button("Continue to App", type="primary"):
+            st.rerun()
+    except (AttributeError, ImportError) as e:
+        # Fallback to direct Stripe link
+        stripe_link = st.secrets.get("payment_links", {}).get("monthly", st.secrets.get("stripe_link", ""))
+        
+        # Centered button
+        col1, col2, col3 = st.columns([2, 1, 2])
+        with col2:
+            if stripe_link:
+                st.markdown(f'<a href="{stripe_link}" target="_blank"><button style="width: 100%; background: #092E19; color: #FFFFFF; border-radius: 0px; border: 1px solid #092E19; padding: 15px 40px; font-weight: 400; font-family: \'Playfair Display\', serif; text-transform: uppercase; letter-spacing: 2px; cursor: pointer;">✨ subscribe</button></a>', unsafe_allow_html=True)
+        
+        st.markdown("<br/>", unsafe_allow_html=True)
+        st.info("✨ After subscribing, refresh this page to access your premium features")
+        
+        if st.button("← Back to Home"):
+            st.session_state.app_access = None
+            st.session_state.show_paywall = False
+            st.rerun()
+        
+        st.stop()
+    except Exception as e:
+        st.error(f"Error: {e}")
+        if st.button("← Back to Home"):
+            st.session_state.app_access = None
+            st.session_state.show_paywall = False
+            st.rerun()
+        st.stop()
+
+# -----------------------------
+# LANDING PAGE
+# -----------------------------
+if st.session_state.app_access is None:
+    # Centered hero section
+    st.markdown("""
+    <div style="text-align: center; padding: 3rem 2rem 0;">
+        <h1 style="font-size: 4.5rem; margin-bottom: 2rem; color: #092E19; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-weight: 600; letter-spacing: -1px; text-transform: lowercase; font-style: normal; text-align: center; margin-left: 3rem;">
+            statements simplified ✨
+        </h1>
+        <p style="font-size: 1.5rem; color: #175C44; margin-bottom: 1.5rem; font-family: 'Playfair Display', serif; font-weight: 400;">
+            Transform your credit card chaos into clarity
+        </p>
+        <p style="font-size: 1.1rem; color: #369692; margin-bottom: 4rem; font-family: 'Playfair Display', serif; font-style: italic;">
+            Upload. Analyze. Understand your spending in seconds.
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Centered button
+    col1, col2, col3 = st.columns([1.5, 1, 1.5])
+    with col2:
+        stripe_link = st.secrets.get("payment_links", {}).get("monthly", st.secrets.get("stripe_link", ""))
+        if stripe_link:
+            st.markdown(f'<a href="{stripe_link}" target="_blank"><button style="width: 100%; background: #092E19; color: #FFFFFF; border-radius: 0px; border: 1px solid #092E19; padding: 15px 40px; font-weight: 400; font-family: \'Playfair Display\', serif; text-transform: uppercase; letter-spacing: 2px; cursor: pointer;">✨ get access</button></a>', unsafe_allow_html=True)
+    
+    # Why choose us section
+    st.markdown("---")
+    st.markdown("""
+    <div style="text-align: center; padding: 3rem 0 2rem 0;">
+        <h3 style="font-size: 1rem; color: #0F462D; font-family: 'Playfair Display', serif; border: none;">Why Statements Simplified?</h3>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    feat1, feat2, feat3 = st.columns(3)
+    
+    with feat1:
+        st.markdown("""
+        <div style="text-align: center; padding: 1rem;">
+            <div style="font-size: 3rem; margin-bottom: 1rem;">🔒</div>
+            <h3 style="font-size: 1.2rem; color: #175C44; margin-bottom: 0.5rem; font-family: 'Playfair Display', serif;">Secure & Private</h3>
+            <p style="color: #092E19; font-size: 0.95rem; font-family: 'Playfair Display', serif;">Your data never leaves your browser. We don't store your financial information.</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with feat2:
+        st.markdown("""
+        <div style="text-align: center; padding: 1rem;">
+            <div style="font-size: 3rem; margin-bottom: 1rem;">⚡</div>
+            <h3 style="font-size: 1.2rem; color: #175C44; margin-bottom: 0.5rem; font-family: 'Playfair Display', serif;">Lightning Fast</h3>
+            <p style="color: #092E19; font-size: 0.95rem; font-family: 'Playfair Display', serif;">Upload multiple statements at once and get instant insights into your spending.</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with feat3:
+        st.markdown("""
+        <div style="text-align: center; padding: 1rem;">
+            <div style="font-size: 3rem; margin-bottom: 1rem;">🎨</div>
+            <h3 style="font-size: 1.2rem; color: #175C44; margin-bottom: 0.5rem; font-family: 'Playfair Display', serif;">Beautiful Design</h3>
+            <p style="color: #092E19; font-size: 0.95rem; font-family: 'Playfair Display', serif;">A clean, minimalist interface that makes financial clarity enjoyable.</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    # Hidden dev/testing free trial button in bottom right
+    st.markdown("""
+    <style>
+    .dev-trial-btn {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        z-index: 999;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    
+    # Create a container for the fixed button
+    if st.button("🔓", key="free_trial", help="Free trial (dev/testing)"):
+        st.session_state.app_access = 'free_trial'
+        st.rerun()
+    
+    st.stop()
+
+# -----------------------------
+# MAIN APP (after landing page)
+# -----------------------------
+# Show access type in sidebar
+with st.sidebar:
+    if st.session_state.app_access == 'free_trial':
+        st.info(f"🆓 Free Trial: {3 - st.session_state.uploads_count} statements remaining")
+        if st.button("Upgrade to Full Access"):
+            st.session_state.app_access = 'paid'
+            st.rerun()
+    elif st.session_state.app_access == 'paid':
+        st.success("✨ Premium Member")
+    
+    if st.button("← Back to Home"):
+        st.session_state.app_access = None
+        st.session_state.uploads_count = 0
+        st.rerun()
 
 st.title("statements simplified ✨")
 
@@ -189,12 +382,32 @@ st.title("statements simplified ✨")
 # -----------------------------
 st.markdown("### 📁 Upload Your Statements")
 st.markdown("*Drop your credit card PDFs here*")
+
+# Check free trial limits
+if st.session_state.app_access == 'free_trial':
+    if st.session_state.uploads_count >= 3:
+        st.warning("🔒 You've reached your free trial limit of 3 statements.")
+        st.info("Upgrade to continue analyzing more statements!")
+        if st.button("Upgrade Now", type="primary"):
+            st.session_state.app_access = 'paid'
+            st.rerun()
+        st.stop()
+
 uploaded_files = st.file_uploader(
     "Choose your statement PDFs:",
     type=["pdf"],
     accept_multiple_files=True,
     help="✨ You can upload multiple PDF statements at once"
 )
+
+# Update upload count for free trial
+if uploaded_files and st.session_state.app_access == 'free_trial':
+    new_uploads = len(uploaded_files)
+    if st.session_state.uploads_count + new_uploads > 3:
+        st.error(f"⚠️ Free trial allows only 3 statements. You're trying to upload {new_uploads} more.")
+        st.info("Please upgrade or reduce the number of files.")
+        st.stop()
+    st.session_state.uploads_count = new_uploads
 
 if not uploaded_files:
     st.info("👆 Upload one or more PDFs to begin your financial journey!")

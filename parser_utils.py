@@ -288,27 +288,85 @@ def extract_amex_summary(text: str) -> Tuple[Optional[float], Optional[float], O
             statement_balance = _money_to_float(m2.group(1))
 
     # ------------------------------------------------------------
-    # 2) Payments/Credits total: prefer Pay Over Time and/or Cash Advance Payments/Credits
-    #    Example shows: Payments/Credits -$869.39
+    # 2) Payments/Credits total: prefer Account Total Payments/Credits
+    #    Example shows: Payments/Credits -$881.44 in Account Total section
     # ------------------------------------------------------------
-    m = re.search(
-        r"Pay Over Time and/or Cash Advance.*?"
-        r"Payments/Credits\s*-\s*\$?([\d,]+\.\d{2})",
+    
+    # Debug: Find all Payments/Credits amounts
+    all_payments = re.findall(
+        r"Payments[/\s]*Credits\s*-?\s*\$?([\d,]+\.\d{2})",
         t,
-        flags=re.IGNORECASE | re.DOTALL,
+        flags=re.IGNORECASE,
     )
-    if m:
-        payments_credits_total = _money_to_float(m.group(1))
-    else:
-        # Fallback: Account Total Payments/Credits -$881.44
-        m2 = re.search(
-            r"Account Total.*?"
-            r"Payments/Credits\s*-\s*\$?([\d,]+\.\d{2})",
+    print(f"🔍 All Payments/Credits found: {all_payments}")
+    
+    # Strategy: Find position of "Account Total" and search for Payments/Credits
+    # in the text that comes AFTER it
+    account_total_pos = t.lower().find("account total")
+    print(f"🔍 Account Total position: {account_total_pos}")
+    
+    if account_total_pos != -1:
+        # Search for Payments/Credits after "Account Total"
+        text_after_account_total = t[account_total_pos:]
+        # Show a snippet of what we're searching
+        snippet = text_after_account_total[:500].replace('\n', ' ')
+        print(f"🔍 Text after Account Total (first 500 chars): {snippet}")
+        
+        # Improved regex: allow for various dashes, spaces, or no dash
+        # We look for the label, then any non-digit characters (like " - $"), then the amount
+        # This handles "Payments/Credits -$881.44" and "Payments/Credits $881.44"
+        m = re.search(
+            r"Payments[/\s]*Credits[^\d\n]*?([\d,]+\.\d{2})",
+            text_after_account_total,
+            flags=re.IGNORECASE,
+        )
+        if m:
+            print(f"✅ Found in Account Total section: ${m.group(1)}")
+            payments_credits_total = _money_to_float(m.group(1))
+        else:
+            print("❌ NOT found after Account Total")
+    
+    # If not found in Account Total section, try other sections
+    if payments_credits_total is None:
+        print("⚠️ Trying Previous Balance section...")
+        # Try Previous Balance section
+        m = re.search(
+            r"Previous\s+Balance[^\$]*?"
+            r"Payments[/\s]*Credits\s*-?\s*\$?([\d,]+\.\d{2})",
             t,
             flags=re.IGNORECASE | re.DOTALL,
         )
-        if m2:
-            payments_credits_total = _money_to_float(m2.group(1))
+        if m:
+            print(f"✅ Found in Previous Balance: ${m.group(1)}")
+            payments_credits_total = _money_to_float(m.group(1))
+    
+    # Last resort: Pay Over Time section
+    if payments_credits_total is None:
+        print("⚠️ Trying Pay Over Time section...")
+        m = re.search(
+            r"Pay Over Time and/or Cash Advance.*?"
+            r"Payments[/\s]*Credits\s*-?\s*\$?([\d,]+\.\d{2})",
+            t,
+            flags=re.IGNORECASE | re.DOTALL,
+        )
+        if m:
+            print(f"⚠️ Found in Pay Over Time: ${m.group(1)}")
+            payments_credits_total = _money_to_float(m.group(1))
+
+    # Extra fallback: "Total Payments and Credits" row in summary table
+    # Example: Total Payments and Credits -$12.05 -$869.39 -$881.44
+    if payments_credits_total is None:
+        print("⚠️ Trying Total Payments and Credits summary line...")
+        line_match = re.search(r"Total\s+Payments\s+and\s+Credits.*", t, re.IGNORECASE)
+        if line_match:
+            line_text = line_match.group(0)
+            print(f"🔍 Found Total Payments and Credits line: {line_text}")
+            # Find all amounts in this line
+            amounts = re.findall(r"[\d,]+\.\d{2}", line_text)
+            if amounts:
+                # The last one is the Total column
+                print(f"✅ Using last amount from summary line: {amounts[-1]}")
+                payments_credits_total = _money_to_float(amounts[-1])
 
     # ------------------------------------------------------------
     # 3) Total purchases/charges/spend (Amex)
