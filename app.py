@@ -3,10 +3,10 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 
-# Mock add_auth if st-paywall is broken with current streamlit version
+# Mock add_auth if st-paywall is missing or broken
 try:
     from st_paywall import add_auth
-except ImportError:
+except (ImportError, Exception):
     def add_auth(required=False):
         pass
 
@@ -25,6 +25,37 @@ if 'app_access' not in st.session_state:
 if 'uploads_count' not in st.session_state:
     st.session_state.uploads_count = 0
 if 'show_paywall' not in st.session_state:
+    st.session_state.show_paywall = False
+
+# Check query params for return from Stripe
+# We check for 'success' or 'session_id' (common Stripe return params)
+try:
+    if hasattr(st, "query_params"):
+        q_params = st.query_params
+    else:
+        q_params = st.experimental_get_query_params()
+        
+    # Robust check for 'success' in various formats
+    is_success = False
+    if "success" in q_params:
+        val = q_params.get("success")
+        if isinstance(val, list):
+            is_success = val[0] == "true"
+        else:
+            is_success = str(val).lower() == "true"
+            
+    if is_success or q_params.get("session_id"):
+        st.session_state.app_access = 'paid'
+        st.session_state.show_paywall = False
+        if 'payment_verified' not in st.session_state:
+            st.session_state.payment_verified = True
+            st.toast("Payment verified! Welcome back.", icon="✨")
+except Exception as e:
+    # Skip if query params are not accessible
+    pass
+
+# If already paid, ensure paywall is off
+if st.session_state.get('app_access') == 'paid':
     st.session_state.show_paywall = False
 
 # Custom CSS for minimalist luxury styling
@@ -87,7 +118,7 @@ st.markdown("""
     
     .stButton>button {
         background: #092E19;
-        color: #FFFFFF;
+        color: #F1F8F6;
         border-radius: 0px;
         border: 1px solid #092E19;
         padding: 15px 40px;
@@ -100,7 +131,7 @@ st.markdown("""
     
     .stButton>button:hover {
         background: #369692;
-        color: #FFFFFF;
+        color: #F1F8F6;
         border-color: #369692;
         transform: none;
         box-shadow: none;
@@ -134,6 +165,15 @@ st.markdown("""
 
     [data-testid="stFileUploader"] {
         border: none !important;
+    }
+
+    [data-testid="stFileUploader"] div, [data-testid="stFileUploader"] span, [data-testid="stFileUploader"] small, [data-testid="stFileUploader"] p {
+        color: #092E19 !important;
+    }
+
+    [data-testid="stFileUploader"] button {
+        color: #092E19 !important;
+        border-color: #092E19 !important;
     }
 
     /* Style the dropdown menu items */
@@ -230,6 +270,12 @@ st.markdown("""
 if st.session_state.show_paywall and st.session_state.app_access == 'paid':
     st.title("statements simplified ✨")
     
+    # Check if we already have success from query params - extra safety
+    if st.query_params.get("success") == "true" or st.session_state.get('payment_verified'):
+        st.session_state.show_paywall = False
+        st.session_state.app_access = 'paid'
+        st.rerun()
+
     st.markdown("""
     <div style="text-align: center; padding: 3rem 2rem;">
         <h2 style="font-size: 2.5rem; margin-bottom: 1rem;">Your financial clarity awaits</h2>
@@ -239,24 +285,46 @@ if st.session_state.show_paywall and st.session_state.app_access == 'paid':
     </div>
     """, unsafe_allow_html=True)
     
+    # Check for google secrets - st-paywall needs them for add_auth
+    has_google = "google_client_id" in st.secrets or "GOOGLE_CLIENT_ID" in st.secrets
+    
     try:
-        # Try to use st-paywall if available
-        from st_paywall import add_auth
-        add_auth(required=True)
-        # If we get here, authentication was successful
-        st.session_state.show_paywall = False
-        st.success("✨ Welcome! You now have full access.")
-        if st.button("Continue to App", type="primary"):
+        if has_google:
+            from st_paywall import add_auth
+            add_auth(required=True)
+            
+            # If we get here, authentication was successful
+            st.session_state.show_paywall = False
+            st.session_state.app_access = 'paid'
+            st.success("✨ Welcome! You now have full access.")
             st.rerun()
-    except (AttributeError, ImportError) as e:
-        # Fallback to direct Stripe link
+        else:
+            # Fallback when Google Auth is not configured
+            raise ImportError("Google credentials not configured for st-paywall login.")
+            
+    except (AttributeError, ImportError, Exception) as e:
+        # Fallback to direct Stripe link or recognition of return
+        # Check params again in case they just returned
+        params = st.query_params if hasattr(st, "query_params") else st.experimental_get_query_params()
+        
+        is_returning = False
+        if "success" in params:
+            val = params.get("success")
+            is_returning = (val[0] == "true") if isinstance(val, list) else (val == "true")
+        
+        if is_returning or params.get("session_id"):
+            st.session_state.show_paywall = False
+            st.session_state.app_access = 'paid'
+            st.success("✨ Welcome back! Access granted.")
+            st.rerun()
+
         stripe_link = st.secrets.get("payment_links", {}).get("monthly", st.secrets.get("stripe_link", ""))
         
         # Centered button
         col1, col2, col3 = st.columns([2, 1, 2])
         with col2:
             if stripe_link:
-                st.markdown(f'<a href="{stripe_link}" target="_blank"><button style="width: 100%; background: #092E19; color: #FFFFFF; border-radius: 0px; border: 1px solid #092E19; padding: 15px 40px; font-weight: 400; font-family: \'Playfair Display\', serif; text-transform: uppercase; letter-spacing: 2px; cursor: pointer;">✨ subscribe</button></a>', unsafe_allow_html=True)
+                st.markdown(f'<a href="{stripe_link}" target="_blank"><button style="width: 100%; background: #092E19; color: #F1F8F6; border-radius: 0px; border: 1px solid #092E19; padding: 15px 40px; font-weight: 400; font-family: \'Playfair Display\', serif; text-transform: uppercase; letter-spacing: 2px; cursor: pointer;">✨ subscribe</button></a>', unsafe_allow_html=True)
         
         st.markdown("<br/>", unsafe_allow_html=True)
         st.info("✨ After subscribing, refresh this page to access your premium features")
@@ -266,13 +334,6 @@ if st.session_state.show_paywall and st.session_state.app_access == 'paid':
             st.session_state.show_paywall = False
             st.rerun()
         
-        st.stop()
-    except Exception as e:
-        st.error(f"Error: {e}")
-        if st.button("← Back to Home"):
-            st.session_state.app_access = None
-            st.session_state.show_paywall = False
-            st.rerun()
         st.stop()
 
 # -----------------------------
@@ -295,11 +356,12 @@ if st.session_state.app_access is None:
     """, unsafe_allow_html=True)
     
     # Centered button
-    col1, col2, col3 = st.columns([1.5, 1, 1.5])
+    col1, col2, col3 = st.columns([1.2, 1.6, 1.2])
     with col2:
-        stripe_link = st.secrets.get("payment_links", {}).get("monthly", st.secrets.get("stripe_link", ""))
-        if stripe_link:
-            st.markdown(f'<a href="{stripe_link}" target="_blank"><button style="width: 100%; background: #092E19; color: #FFFFFF; border-radius: 0px; border: 1px solid #092E19; padding: 15px 40px; font-weight: 400; font-family: \'Playfair Display\', serif; text-transform: uppercase; letter-spacing: 2px; cursor: pointer;">✨ get access</button></a>', unsafe_allow_html=True)
+        if st.button("✨ get access", type="primary", use_container_width=True):
+            st.session_state.app_access = 'paid'
+            st.session_state.show_paywall = True
+            st.rerun()
     
     # Privacy disclaimer
     st.markdown("<br/>", unsafe_allow_html=True)
@@ -386,6 +448,7 @@ with st.sidebar:
         st.info(f"🆓 Free Trial: {3 - st.session_state.uploads_count} statements remaining")
         if st.button("Upgrade to Full Access"):
             st.session_state.app_access = 'paid'
+            st.session_state.show_paywall = True
             st.rerun()
     elif st.session_state.app_access == 'paid':
         st.success("✨ Premium Member")
@@ -410,6 +473,7 @@ if st.session_state.app_access == 'free_trial':
         st.info("Upgrade to continue analyzing more statements!")
         if st.button("Upgrade Now", type="primary"):
             st.session_state.app_access = 'paid'
+            st.session_state.show_paywall = True
             st.rerun()
         st.stop()
 
@@ -548,13 +612,13 @@ with col_gauge:
         }
     ))
     gauge.update_layout(
-        height=300, 
+        height=350, 
         margin=dict(l=40, r=40, t=40, b=20),
         paper_bgcolor='rgba(0,0,0,0)',
         plot_bgcolor='rgba(0,0,0,0)',
-        font={'family': "Playfair Display"}
+        font={'family': "Playfair Display", 'color': "black"}
     )
-    st.plotly_chart(gauge, width='stretch')
+    st.plotly_chart(gauge, width='stretch', theme=None)
 
 st.divider()
 
@@ -652,7 +716,8 @@ fig_sankey = go.Figure(data=[go.Sankey(
                     for subcat in unique_subcategories],
         hovertemplate='<b>%{label}</b><br>Total: %{customdata}<extra></extra>',
         hoverlabel=dict(
-            font=dict(family="Playfair Display, serif", size=12),
+            bgcolor="white",
+            font=dict(family="Playfair Display, serif", size=12, color="black"),
             bordercolor="rgba(0,0,0,0)"
         )
     ),
@@ -663,26 +728,26 @@ fig_sankey = go.Figure(data=[go.Sankey(
         color="rgba(36, 125, 150, 0.2)",
         hovertemplate='%{source.label} → %{target.label}<br>$%{value:,.2f}<extra></extra>',
         hoverlabel=dict(
-            font=dict(family="Playfair Display, serif", size=12),
+            bgcolor="white",
+            font=dict(family="Playfair Display, serif", size=12, color="black"),
             bordercolor="rgba(0,0,0,0)"
         )
     ),
-    textfont=dict(family="Playfair Display, serif", size=12, color="#092E19") 
+    textfont=dict(family="Playfair Display, serif", size=12, color="black") 
 )])
 
 fig_sankey.update_layout(
     title=dict(
         text=f"spending flow: ${total_spending:,.2f}",
-        font=dict(size=28, color="#092E19", family="Playfair Display, serif")
+        font=dict(size=28, color="black", family="Playfair Display, serif")
     ),
-    font=dict(size=14, family="Playfair Display, serif"),
-    height=600, 
-    paper_bgcolor='rgba(0,0,0,0)',
+    font=dict(size=14, family="Playfair Display, serif", color="black"),
+    height=700,
     plot_bgcolor='rgba(0,0,0,0)',
-    margin=dict(l=40, r=40, t=80, b=40) 
+    paper_bgcolor='rgba(0,0,0,0)',
 )
 
-st.plotly_chart(fig_sankey, width='stretch')
+st.plotly_chart(fig_sankey, use_container_width=True, theme=None)
 
 st.divider()
 
@@ -708,7 +773,7 @@ with c1:
             food,
             x="subcategory",
             y="amount",
-            height=300,
+            height=400,
             color="category",
             color_discrete_map={
                 "Groceries": "#175C44",
@@ -723,13 +788,13 @@ with c1:
         fig_food.update_layout(
             showlegend=True,
             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-            margin=dict(l=10, r=10, t=60, b=10),
+            margin=dict(l=10, r=10, t=60, b=50),
             plot_bgcolor='rgba(0,0,0,0)',
             paper_bgcolor='rgba(0,0,0,0)',
-            font={'family': "Playfair Display", 'color': "#092E19"}
+            font={'family': "Playfair Display", 'color': "black"}
         )
         fig_food.update_traces(textposition='outside')
-        st.plotly_chart(fig_food, width='stretch')
+        st.plotly_chart(fig_food, use_container_width=True, theme=None)
         
         # Add total
         food_total = food["amount"].sum()
@@ -746,7 +811,7 @@ with c2:
             lifestyle,
             x="subcategory",
             y="amount",
-            height=300,
+            height=400,
             color="category",
             color_discrete_map={
                 "Shopping": "#175C44",
@@ -760,13 +825,13 @@ with c2:
         fig_lifestyle.update_layout(
             showlegend=True,
             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-            margin=dict(l=10, r=10, t=60, b=10),
+            margin=dict(l=10, r=10, t=60, b=50),
             plot_bgcolor='rgba(0,0,0,0)',
             paper_bgcolor='rgba(0,0,0,0)',
-            font={'family': "Playfair Display", 'color': "#092E19"}
+            font={'family': "Playfair Display", 'color': "black"}
         )
         fig_lifestyle.update_traces(textposition='outside')
-        st.plotly_chart(fig_lifestyle, width='stretch')
+        st.plotly_chart(fig_lifestyle, use_container_width=True, theme=None)
         
         # Add total
         lifestyle_total = lifestyle["amount"].sum()
@@ -784,7 +849,7 @@ with c3:
             transport,
             x="subcategory",
             y="amount",
-            height=300,
+            height=400,
             color="subcategory",
             color_discrete_map={
                 "Uber": "#175C44",
@@ -799,13 +864,13 @@ with c3:
 
         fig_transport.update_layout(
             showlegend=False,
-            margin=dict(l=10, r=10, t=60, b=10),
+            margin=dict(l=10, r=10, t=60, b=50),
             plot_bgcolor='rgba(0,0,0,0)',
             paper_bgcolor='rgba(0,0,0,0)',
-            font={'family': "Playfair Display", 'color': "#092E19"}
+            font={'family': "Playfair Display", 'color': "black"}
         )
         fig_transport.update_traces(textposition='outside')
-        st.plotly_chart(fig_transport, width='stretch')
+        st.plotly_chart(fig_transport, use_container_width=True, theme=None)
         
         # Add total
         transport_total = transport["amount"].sum()
@@ -944,7 +1009,7 @@ with f2:
 
 with f3:
     st.markdown("<br/>", unsafe_allow_html=True)  # Spacer
-    if st.button("🔄 Reset Filters", width='stretch'):
+    if st.button("🔄 Reset Filters", use_container_width=True):
         st.rerun()
 
 # --- Apply filters ---
@@ -973,9 +1038,9 @@ if selected_card != 'All':
 
 st.markdown(f"""
 <div style='background: linear-gradient(135deg, #175C44 0%, #80C1B2 100%); padding: 30px; border-radius: 0px; margin: 20px 0; border: none;'>
-    <div style='color: rgba(255,255,255,0.8); font-size: 12px; text-transform: uppercase; letter-spacing: 3px; margin-bottom: 12px; font-weight: 500;'>{filter_label}</div>
-    <div style='color: #FFFFFF; font-size: 52px; font-weight: 400; font-family: "Playfair Display", serif;'>${filtered_spend.amount.sum():,.2f}</div>
-    <div style='color: rgba(255,255,255,0.7); font-size: 14px; margin-top: 10px; font-style: italic;'>{len(filtered_spend)} transactions</div>
+    <div style='color: rgba(241, 248, 246, 0.8); font-size: 12px; text-transform: uppercase; letter-spacing: 3px; margin-bottom: 12px; font-weight: 500;'>{filter_label}</div>
+    <div style='color: #F1F8F6; font-size: 52px; font-weight: 400; font-family: "Playfair Display", serif;'>${filtered_spend.amount.sum():,.2f}</div>
+    <div style='color: rgba(241, 248, 246, 0.7); font-size: 14px; margin-top: 10px; font-style: italic;'>{len(filtered_spend)} transactions</div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -1007,7 +1072,7 @@ display_df = pd.concat([display_df, total_row], ignore_index=True)
 
 st.dataframe(
     display_df,
-    width='stretch',
+    use_container_width=True,
     height=420
 )
 
@@ -1022,7 +1087,7 @@ with col2:
         data.to_csv(index=False),
         "monthly_transactions.csv",
         "text/csv",
-        width='stretch',
+        use_container_width=True,
         help="Export all transaction data to CSV format"
     )
 
@@ -1072,7 +1137,7 @@ display_balance_df = pd.concat([display_balance_df, total_row], ignore_index=Tru
 
 st.dataframe(
     display_balance_df,
-    width='stretch',
+    use_container_width=True,
     height=220,
     hide_index=True
 )
@@ -1121,7 +1186,7 @@ display_payments_df = pd.concat([display_payments_df, total_row_payments], ignor
 
 st.dataframe(
     display_payments_df,
-    width='stretch',
+    use_container_width=True,
     height=220
 )
 
@@ -1168,6 +1233,6 @@ display_spend_df = pd.concat([display_spend_df, total_row_spend], ignore_index=T
 
 st.dataframe(
     display_spend_df,
-    width='stretch',
+    use_container_width=True,
     height=220
 )

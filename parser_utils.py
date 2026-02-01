@@ -94,6 +94,10 @@ def detect_bank_type_from_filename(card_name: str) -> str:
     if "estmt" in name or "bankofamerica" in name or "boa" in name:
         return "bank_of_america"
 
+    # Chase
+    if "chase" in name:
+        return "chase"
+
     # Citi (month+year NO SPACE)
     if re.search(r"(jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\d{4}", name):
         return "citi"
@@ -487,6 +491,39 @@ def extract_apple_total_spend(pdf) -> Optional[float]:
 
     return float(m.group(1).replace(",", ""))
 
+
+def extract_chase_summary(text: str) -> Tuple[Optional[float], Optional[float]]:
+    """
+    Extract summary totals from Chase statement.
+    
+    Returns (spend_total, payments_credits_total)
+    
+    Chase format on first page:
+        Purchases +$1,023.84
+        Payment, Credits -$1,164.77
+    """
+    spend_total = None
+    payments_credits_total = None
+    
+    # Purchases total
+    m = re.search(
+        r"Purchases\s+\+?\$?([\d,]+\.\d{2})",
+        text,
+        re.IGNORECASE
+    )
+    if m:
+        spend_total = normalize_amount(m.group(1))
+    
+    # Payment, Credits total
+    m = re.search(
+        r"Payment,?\s*Credits\s+-\$?([\d,]+\.\d{2})",
+        text,
+        re.IGNORECASE
+    )
+    if m:
+        payments_credits_total = normalize_amount(m.group(1))
+    
+    return spend_total, payments_credits_total
 
 
 # =============================

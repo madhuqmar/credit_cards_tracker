@@ -18,6 +18,7 @@ from parser_utils import (
     extract_apple_statement_balance,
     extract_apple_total_payments,
     extract_apple_total_spend,
+    extract_chase_summary,
     parse_date,
 )
 
@@ -70,6 +71,15 @@ AMEX_ROW_REGEX = re.compile(
     (?P<desc>.+?)\s+
     (?P<amount>-?\$[\d,]+\.\d{2})
     (?:\S*)?$   # swallow trailing symbols like ⧫
+    """,
+    re.VERBOSE,
+)
+
+CHASE_ROW_REGEX = re.compile(
+    r"""
+    ^(?P<trans_date>\d{1,2}/\d{1,2})\s+
+    (?P<desc>.+?)\s+
+    (?P<amount>-?[\d,]+\.\d{2})$
     """,
     re.VERBOSE,
 )
@@ -246,6 +256,23 @@ def extract_transactions_from_pdf(pdf_file, card_name: str) -> pd.DataFrame:
             if match.group("amount").strip().startswith("-"):
                 amount = -abs(amount)
 
+        # =========================
+        # Chase
+        # =========================
+        elif bank_type == "chase":
+            match = CHASE_ROW_REGEX.match(line.strip())
+            if not match:
+                continue
+
+            date = parse_date(match.group("trans_date"))
+            merchant = match.group("desc").strip()
+            amount_str = match.group("amount")
+            
+            # Parse amount with sign
+            if amount_str.startswith("-"):
+                amount = -abs(float(amount_str.replace("-", "").replace(",", "")))
+            else:
+                amount = abs(float(amount_str.replace(",", "")))
 
         # ---- Generic rows
         else:
@@ -281,7 +308,12 @@ def extract_transactions_from_pdf(pdf_file, card_name: str) -> pd.DataFrame:
             "internet payment",
             "credit adjustment",
             "points for statement credit",
-            "ach deposit"
+            "ach deposit",
+            "cash rewards",
+            "cash back",
+            "debit adjustment",
+            "statement credit",
+            "payment thank you"
         ]
 
         merchant_lower = merchant.lower()
@@ -347,6 +379,9 @@ def extract_transactions_from_pdf(pdf_file, card_name: str) -> pd.DataFrame:
 
     elif bank_type == "amex":
         statement_balance, payments_credits_total, spend_total = extract_amex_summary(text)
+
+    elif bank_type == "chase":
+        spend_total, payments_credits_total = extract_chase_summary(text)
 
     if bank_type == "apple":
         statement_balance = extract_apple_statement_balance(pdf)
