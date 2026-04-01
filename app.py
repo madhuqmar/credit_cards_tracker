@@ -852,9 +852,9 @@ with c3:
             height=400,
             color="subcategory",
             color_discrete_map={
-                "Uber": "#175C44",
-                "Lyft": "#2A8477",
-                "Metro": "#369692",
+                "Uber/Lyft": "#175C44",
+                "Metro": "#2A8477",
+                "Train/Bus": "#369692",
                 "Bikes": "#092E19"
             },
             labels={"amount": "Amount ($)", "subcategory": ""},
