@@ -358,7 +358,7 @@ if st.session_state.app_access is None:
     # Centered button
     col1, col2, col3 = st.columns([1.2, 1.6, 1.2])
     with col2:
-        if st.button("✨ get access", type="primary", use_container_width=True):
+        if st.button("✨ get access", type="primary", width="stretch"):
             st.session_state.app_access = 'paid'
             st.session_state.show_paywall = True
             st.rerun()
@@ -747,7 +747,7 @@ fig_sankey.update_layout(
     paper_bgcolor='rgba(0,0,0,0)',
 )
 
-st.plotly_chart(fig_sankey, use_container_width=True, theme=None)
+st.plotly_chart(fig_sankey, width="stretch", theme=None)
 
 st.divider()
 
@@ -794,7 +794,7 @@ with c1:
             font={'family': "Playfair Display", 'color': "black"}
         )
         fig_food.update_traces(textposition='outside')
-        st.plotly_chart(fig_food, use_container_width=True, theme=None)
+        st.plotly_chart(fig_food, width="stretch", theme=None)
         
         # Add total
         food_total = food["amount"].sum()
@@ -831,7 +831,7 @@ with c2:
             font={'family': "Playfair Display", 'color': "black"}
         )
         fig_lifestyle.update_traces(textposition='outside')
-        st.plotly_chart(fig_lifestyle, use_container_width=True, theme=None)
+        st.plotly_chart(fig_lifestyle, width="stretch", theme=None)
         
         # Add total
         lifestyle_total = lifestyle["amount"].sum()
@@ -870,7 +870,7 @@ with c3:
             font={'family': "Playfair Display", 'color': "black"}
         )
         fig_transport.update_traces(textposition='outside')
-        st.plotly_chart(fig_transport, use_container_width=True, theme=None)
+        st.plotly_chart(fig_transport, width="stretch", theme=None)
         
         # Add total
         transport_total = transport["amount"].sum()
@@ -1009,7 +1009,7 @@ with f2:
 
 with f3:
     st.markdown("<br/>", unsafe_allow_html=True)  # Spacer
-    if st.button("🔄 Reset Filters", use_container_width=True):
+    if st.button("🔄 Reset Filters", uwidth="stretch"):
         st.rerun()
 
 # --- Apply filters ---
@@ -1072,7 +1072,7 @@ display_df = pd.concat([display_df, total_row], ignore_index=True)
 
 st.dataframe(
     display_df,
-    use_container_width=True,
+    width="stretch",
     height=420
 )
 
@@ -1087,7 +1087,7 @@ with col2:
         data.to_csv(index=False),
         "monthly_transactions.csv",
         "text/csv",
-        use_container_width=True,
+        uwidth="stretch",
         help="Export all transaction data to CSV format"
     )
 
@@ -1137,7 +1137,7 @@ display_balance_df = pd.concat([display_balance_df, total_row], ignore_index=Tru
 
 st.dataframe(
     display_balance_df,
-    use_container_width=True,
+    width="stretch",
     height=220,
     hide_index=True
 )
@@ -1186,7 +1186,7 @@ display_payments_df = pd.concat([display_payments_df, total_row_payments], ignor
 
 st.dataframe(
     display_payments_df,
-    use_container_width=True,
+    width="stretch",
     height=220
 )
 
@@ -1233,6 +1233,6 @@ display_spend_df = pd.concat([display_spend_df, total_row_spend], ignore_index=T
 
 st.dataframe(
     display_spend_df,
-    use_container_width=True,
+    width="stretch",
     height=220
 )
