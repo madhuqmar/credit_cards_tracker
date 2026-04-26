@@ -26,7 +26,8 @@ def categorize_transaction(merchant: str):
         "coffee",
         "sugar & twine",
         "blanchard",
-        "sugar shack"
+        "sugar shack",
+        "maman"
     ]):
         return "Food", "Coffee"
 
@@ -64,7 +65,8 @@ def categorize_transaction(merchant: str):
         return "Food", "Breakfast"
     
     if any(x in m for x in [
-        "wunder garten"
+        "wunder garten",
+        "a.i pop"
     ]):
         return "Food", "Drinks"
 
@@ -127,7 +129,9 @@ def categorize_transaction(merchant: str):
         "bistro",
         "grill",
         "earls",
-        "lillie pearl"
+        "lillie pearl",
+        "tiger fork",
+        "ottoman taverna"
     ]):
         return "Food", "Dining"
 
@@ -146,10 +150,11 @@ def categorize_transaction(merchant: str):
         "stellas",
         "union market",
         "shields market",
-        "a litteriwasbingtondc"
-        "ansel"
+        "litteriwashington",
+        "tst* starr",
+        "st. ansel"
     ]):
-        return "Groceries", "Store"
+        return "Groceries", "Market"
 
     # -------------------------
     # TRANSPORTATION
@@ -203,7 +208,8 @@ def categorize_transaction(merchant: str):
         "gamma",
         "midjourney",
         "claude",
-        "cursor"
+        "cursor",
+        "anthropic"
     ]):
         return "Subscriptions", "Code / Design"
 
@@ -224,7 +230,7 @@ def categorize_transaction(merchant: str):
         "beauty",
         "unwind"
     ]):
-        return "Beauty / Grooming", "Services"
+        return "Grooming", "Services"
 
     # -------------------------
     # SHOPPING
@@ -238,7 +244,7 @@ def categorize_transaction(merchant: str):
         "babyboo",
         "meshki",
         "uniqlo",
-        "salt sundry"
+        "salt sundry",
     ]):
         return "Shopping", "Clothes"
 
@@ -249,7 +255,9 @@ def categorize_transaction(merchant: str):
         "tiktok shop",
         "ross",
         "cvs",
-        "bluemercury"
+        "bluemercury",
+        "target",
+        "printemps pottery"
     ]):
         return "Shopping", "Retail"
 
